@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>437 Studio | Amnesia's Sound Clicker</title>
+        <link rel="icon" type="image/png" href="/img/logo.png">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/maintenance.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .clicker-grid {
+            max-width: 1400px;
+            margin: 120px auto 40px auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 1fr 1.5fr 1fr;
+            gap: 25px;
+        }
+        @media (max-width: 1100px) {
+            .clicker-grid { grid-template-columns: 1fr; margin-top: 100px; }
+        }
+        .matrix-panel {
+            background: #0c0c18;
+            border: 2px solid #ff007f;
+            box-shadow: 0 0 20px rgba(255, 0, 127, 0.15);
+            border-radius: 8px;
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .mic-core { text-align: center; padding: 20px 10px; }
+        .neon-mic-btn {
+            background: radial-gradient(circle, #1a001a 0%, #04040c 70%);
+            border: 3px solid #ff007f;
+            border-radius: 50%;
+            width: 230px;
+            height: 230px;
+            margin: 25px auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            position: relative;
+            user-select: none;
+            box-shadow: 0 0 35px rgba(255, 0, 127, 0.25);
+            transition: transform 0.05s ease, box-shadow 0.2s ease, border-color 0.2s;
+        }
+        .neon-mic-btn:active { transform: scale(0.94); box-shadow: 0 0 60px #ff007f; }
+        .neon-mic-btn i {
+            font-size: 95px;
+            color: #fff;
+            text-shadow: 0 0 20px #ff007f, 0 0 40px #ff007f;
+            animation: pulse-mic 2s infinite ease-in-out;
+        }
+        @keyframes pulse-mic {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.06); text-shadow: 0 0 30px #ff007f, 0 0 65px #ff007f; }
+        }
+        .click-floating-text {
+            position: absolute;
+            pointer-events: none;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 22px;
+            animation: float-up-particle 0.75s forwards ease-out;
+            z-index: 999;
+        }
+        @keyframes float-up-particle {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-140px) scale(0.75); }
+        }
+        .upgrades-scroll-pane {
+            max-height: 680px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+        .upgrades-scroll-pane::-webkit-scrollbar { width: 6px; }
+        .upgrades-scroll-pane::-webkit-scrollbar-thumb { background: #ff007f; border-radius: 4px; }
+        .upgrade-row {
+            background: #06060f;
+            border: 1px solid #1a1a3a;
+            border-radius: 4px;
+            padding: 14px 18px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .upgrade-row:hover { border-color: #00f0ff; box-shadow: 0 0 10px rgba(0, 240, 255, 0.05); }
+        .up-meta-block { flex-grow: 1; }
+        .up-title-line { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 15px; color: #fff; }
+        .up-count-badge { font-size: 11px; background: #141428; border: 1px solid #00f0ff; color: #00f0ff; padding: 1px 6px; border-radius: 3px; font-family: monospace; font-weight: bold; }
+        .up-description-line { font-size: 12px; color: #777; margin-top: 4px; line-height: 1.4; }
+        .btn-upgrade-action {
+            background: transparent;
+            border: 1px solid #00f0ff;
+            color: #00f0ff;
+            padding: 8px 16px;
+            font-size: 12px;
+            font-family: monospace;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+        .btn-upgrade-action:hover:not(:disabled) { background: #00f0ff; color: #000; box-shadow: 0 0 15px #00f0ff; }
+        .btn-upgrade-action:disabled { border-color: #222; color: #444; cursor: not-allowed; }
+        .buff-grid { display: flex; flex-direction: column; gap: 14px; margin-top: 15px; }
+        .buff-card { background: #06060f; border: 1px solid #222; border-radius: 4px; padding: 15px; position: relative; transition: border-color 0.3s; }
+        .buff-card.active-buff { border-color: #ffd700; box-shadow: 0 0 15px rgba(255, 215, 0, 0.1); }
+        .buff-progress-bar { height: 5px; background: #111; width: 100%; margin-top: 10px; border-radius: 2px; overflow: hidden; display: none; }
+        .buff-progress-fill { height: 100%; background: #ffd700; width: 0%; transition: width 0.1s linear; }
+        .stat-line-terminal { background: #05050f; font-family: monospace; padding: 12px 15px; border-radius: 4px; border-left: 3px solid #00ff66; font-size: 13px; color: #00ff66; margin-bottom: 15px; line-height: 1.7; box-shadow: inset 0 0 10px rgba(0, 255, 102, 0.02); }
+        .terminal-log-output { background: #030308; border: 1px solid #112; font-family: monospace; font-size: 11px; color: #555; padding: 10px; border-radius: 4px; height: 110px; overflow-y: hidden; margin-top: 15px; text-align: left; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="grid-overlay"></div>
+
+  <nav class="navbar">
+        <div class="logo">437<span>Studio</span></div>
+        <div class="menu-toggle"><i class="fas fa-bars"></i></div>
+        <ul class="nav-links">
+            <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="forum.html"><i class="fas fa-comments"></i> Forum</a></li>
+            <li><a href="games.html"><i class="fas fa-gamepad"></i> Games</a></li>
+            <li><a href="mitglieder.html"><i class="fas fa-users"></i> Mitglieder</a></li>  
+            <li><a href="music.html"><i class="fas fa-music"></i> Musik</a></li>
+            <li><a href="discord.html"><i class="fab fa-discord"></i> Discord</a></li>
+            <li class="auth-container">
+                <div id="logged-out-zone">
+                    <button class="btn btn-neon-blue" onclick="redirectToLogin()">Login / Register</button>
+                </div>
+                <!-- Das Badge liegt hier direkt im Haupt-Trigger-Button für permanente Sichtbarkeit -->
+                <div id="logged-in-zone" class="hidden user-trigger" onclick="toggleProfileDropdown()">
+                    <img id="nav-avatar" src="" alt="Avatar">
+                    <span id="nav-username">User</span> 
+                    <span id="admin-badge" class="hidden" style="color:#ff007f; font-size:10px; border:1px solid #ff007f; padding:2px 4px; border-radius:4px; margin-left:5px;">ADMIN</span>
+                    <span id="dropdown-msg-badge" class="hidden"></span>
+                    <div id="profile-dropdown" class="dropdown-menu hidden"></div>
+                </div>
+            </li>
+        </ul>
+    </nav>
+    <!-- HAUPT-ARBEITSBEREICH DER SOUND-MATRIX -->
+    <div class="clicker-grid">
+        
+        <!-- LINKE SPALTE: DAS GENERATOR-MIKROFON & NETZWERK-STATUS -->
+        <div class="matrix-panel mic-core">
+            <h2 class="neon-text-pink" style="font-size:20px; text-transform:uppercase; letter-spacing:1px;">Amnesia437 mic</h2>
+            
+            <!-- Das interaktive Haupt-Mikrofon -->
+            <div class="neon-mic-btn" id="studio-mic-trigger">
+                <i class="fas fa-microphone-alt"></i>
+            </div>
+
+            <!-- Terminal-Anzeige für generierte Werte -->
+            <div class="stat-line-terminal">
+                <div>🎵 TOTAL BEATS: <span id="stat-total-beats">0</span></div>
+                <div>⚡ BEATS / KLICK: <span id="stat-bpk">1</span></div>
+                <div>🤖 PASSIV / SEK: <span id="stat-bps">0</span></div>
+            </div>
+
+            <!-- Lokales Event-Protokoll -->
+            <div class="terminal-log-output" id="clicker-terminal-logs">
+                <div>[SYSTEM]: Initialisiere Amnesia_Clicker v0.1...</div>
+                <div>[SYSTEM]: Warte auf Audio-Input-Signale...</div>
+                <div>[SYSTEM]: Klapsenkind loading...</div>
+            </div>
+        </div>
+
+        <!-- MITTLERE SPALTE: DIE LISTE DER 20 UPGRADE-OPTIONEN -->
+        <div class="matrix-panel" style="border-color: #00f0ff; box-shadow: 0 0 20px rgba(0, 240, 255, 0.15);">
+            <h2 class="neon-text-blue" style="font-size:18px; text-transform:uppercase; margin-bottom:15px; text-align:center;">
+                <i class="fas fa-sliders-h"></i> Studio Ausstattung
+            </h2>
+            <div class="upgrades-scroll-pane" id="upgrades-matrix-target">
+                <!-- Wird vollautomatisch durch clicker.js generiert -->
+            </div>
+        </div>
+
+        <!-- RECHTE SPALTE: COINS & DARKNET OVERDRIVE SHOP -->
+        <div class="matrix-panel" style="border-color:#ffd700; box-shadow:0 0 20px rgba(255,215,0,0.15);">
+            <h2 style="color:#ffd700; text-shadow:0 0 5px #ffd700; font-size:18px; text-transform:uppercase; text-align:center; margin-bottom:15px;">
+                <i class="fas fa-crypto"></i> Amnesia Crypto Exchange
+            </h2>
+            
+            <div class="wallet-info" style="background:#06060f; padding:12px; border-radius:4px; text-align:center; font-family:monospace; font-size:16px; margin-bottom:20px; border-left:3px solid #ffd700;">
+                <span>AMNESIA CRYPTO: 🪙 <span id="wallet-amnesia-coins" style="color:#ffd700; font-weight:bold;">0</span></span>
+            </div>
+
+            <h3 class="neon-text-pink" style="font-size:13px; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">Darknet Overdrive Buffs</h3>
+            <div class="buff-grid">
+                
+                <!-- Buff Option 1 -->
+                <div class="buff-card" id="buff-card-double">
+                    <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:bold;">
+                        <span style="color:#fff;">Double Click Matrix</span>
+                        <span style="color:#ffd700; margin-left:auto;">5 🪙</span>
+                    </div>
+                    <div style="font-size:11px; color:#666; margin-top:4px;">Verdoppelt die manuelle Klick-Leistung für 30 Sekunden.</div>
+                    <button class="btn-buy" id="btn-buff-double" onclick="triggerBuffEngine('double')" style="width:100%; border-color:#ffd700; color:#ffd700; margin-top:10px; background:transparent; padding:6px; cursor:pointer;">Zünden</button>
+                    <div class="buff-progress-bar" id="progress-double"><div class="buff-progress-fill" id="fill-double"></div></div>
+                </div>
+
+                <!-- Buff Option 2 -->
+                <div class="buff-card" id="buff-card-overdrive">
+                    <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:bold;">
+                        <span style="color:#fff;">Sample-Overdrive</span>
+                        <span style="color:#ffd700; margin-left:auto;">10 🪙</span>
+                    </div>
+                    <div style="font-size:11px; color:#666; margin-top:4px;">Erhöht das passive Einkommen (BpS) für 20 Sekunden um das 5-fache.</div>
+                    <button class="btn-buy" id="btn-buff-overdrive" onclick="triggerBuffEngine('overdrive')" style="width:100%; border-color:#ffd700; color:#ffd700; margin-top:10px; background:transparent; padding:6px; cursor:pointer;">Zünden</button>
+                    <div class="buff-progress-bar" id="progress-overdrive"><div class="buff-progress-fill" id="fill-overdrive"></div></div>
+                </div>
+
+                <!-- Buff Option 3 -->
+                <div class="buff-card" id="buff-card-fever">
+                    <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:bold;">
+                        <span style="color:#fff;">Krypto-Fieber</span>
+                        <span style="color:#ffd700; margin-left:auto;">15 🪙</span>
+                    </div>
+                    <div style="font-size:11px; color:#666; margin-top:4px;">Für 15 Sekunden generiert jeder Klick garantiert einen Amnesia-Coin.</div>
+                    <button class="btn-buy" id="btn-buff-fever" onclick="triggerBuffEngine('fever')" style="width:100%; border-color:#ffd700; color:#ffd700; margin-top:10px; background:transparent; padding:6px; cursor:pointer;">Zünden</button>
+                    <div class="buff-progress-bar" id="progress-fever"><div class="buff-progress-fill" id="fill-fever"></div></div>
+                </div>
+
+            </div>
+        </div>
+        <div class="matrix-panel" style="border-color: #00ff66; box-shadow: 0 0 20px rgba(0, 255, 102, 0.15); margin-top: 25px;">
+    <h2 class="neon-text-green" style="font-size:18px; text-transform:uppercase; margin-bottom:15px; text-align:center;">
+        <i class="fas fa-trophy"></i> Studio Leaderboard
+    </h2>
+    <div id="leaderboard-list" style="font-family: monospace; font-size: 13px;">
+        <div style="color: #666; text-align: center;">Lade Bestenliste...</div>
+    </div>
+</div>
+
+    </div>
+
+    <!-- Verbindung zu den Skripten -->
+    <script src="/js/app.js"></script>
+    <script src="/js/clicker.js"></script>
+</body>
+</html>

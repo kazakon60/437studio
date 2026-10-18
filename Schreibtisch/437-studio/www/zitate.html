@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>437 Studio | Grünes Paradies Zitate</title>
+    <link rel="icon" type="image/png" href="/img/logo.png">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/maintenance.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            z-index: 1000;
+            padding: 15px 30px;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            list-style: none;
+            gap: 15px;
+            margin: 0;
+            padding: 0;
+            flex-wrap: nowrap;
+        }
+
+        .auth-container {
+            display: flex;
+            align-items: center;
+            position: relative;
+            margin-left: 10px;
+        }
+
+        .user-trigger {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 5px 12px;
+            background: rgba(0, 240, 255, 0.08);
+            border: 1px solid #00f0ff;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .user-trigger:hover {
+            background: rgba(0, 240, 255, 0.15);
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+        }
+
+        .user-trigger img {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            background: #080814;
+            border: 1px solid #00f0ff;
+            border-radius: 6px;
+            min-width: 170px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.9), 0 0 12px rgba(0, 240, 255, 0.2);
+            z-index: 99999 !important;
+        }
+
+        .dropdown-menu.hidden {
+            display: none !important;
+        }
+
+        :root {
+            --bg-color: #05050f;
+            --accent-green: #00ff66;
+            --accent-glow: rgba(0, 240, 255, 0.25);
+            --accent-cyan: #00f0ff;
+            --accent-pink: #ff007f;
+            --accent-gold: #ffd700;
+            --border-theme: rgba(0, 240, 255, 0.25);
+        }
+
+        /* Toolbar & Controls */
+        .matrix-toolbar {
+            max-width: 1000px;
+            margin: 0 auto 20px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .search-input, .matrix-select {
+            background: rgba(8, 8, 20, 0.9);
+            border: 1px solid var(--border-theme);
+            color: #fff;
+            padding: 11px 16px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+            transition: all 0.3s ease;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 220px;
+            max-width: 400px;
+        }
+
+        .matrix-select {
+            cursor: pointer;
+        }
+
+        .search-input:focus, .matrix-select:focus {
+            border-color: var(--accent-cyan);
+            outline: none;
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+        }
+
+        .btn-matrix {
+            background: rgba(0, 240, 255, 0.08);
+            color: var(--accent-cyan);
+            border: 1px solid var(--accent-cyan);
+            padding: 11px 22px;
+            font-family: monospace;
+            font-weight: 700;
+            font-size: 12px;
+            letter-spacing: 1px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-matrix:hover {
+            background: var(--accent-cyan);
+            color: var(--bg-color);
+            box-shadow: 0 0 20px var(--accent-cyan);
+            transform: translateY(-2px);
+        }
+
+        /* Admin-Panel Box */
+        #admin-quote-panel {
+            max-width: 1000px;
+            margin: 25px auto 0;
+            background: rgba(10, 10, 26, 0.95);
+            border: 1px solid var(--accent-cyan);
+            border-radius: 10px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 240, 255, 0.12);
+            display: none;
+            text-align: left;
+            backdrop-filter: blur(10px);
+        }
+
+        #admin-quote-panel h3 {
+            font-family: monospace;
+            color: var(--accent-cyan);
+            margin-top: 0;
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+
+        .admin-form-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .admin-input, .admin-select {
+            background: #05050f;
+            border: 1px solid var(--border-theme);
+            color: #fff;
+            padding: 11px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .admin-input:focus, .admin-select:focus {
+            border-color: var(--accent-cyan);
+            outline: none;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+        }
+
+        .btn-admin-action {
+            background: var(--accent-cyan);
+            color: #05050f;
+            border: none;
+            padding: 12px 20px;
+            font-family: monospace;
+            font-weight: 700;
+            font-size: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 15px;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.2);
+        }
+
+        .btn-admin-action:hover {
+            background: #00c0cc;
+            box-shadow: 0 0 25px var(--accent-cyan);
+            transform: translateY(-2px);
+        }
+
+        .matrix-stats {
+            text-align: center;
+            font-size: 12px;
+            color: #608090;
+            margin-top: 15px;
+            letter-spacing: 1px;
+        }
+
+        /* --- HOCHWERTIGE CYBER-KARTEN --- */
+        .container {
+            max-width: 1150px;
+            margin: 40px auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 30px;
+            align-items: stretch;
+        }
+
+        .quote-card {
+            background: linear-gradient(160deg, rgba(12, 12, 28, 0.95), rgba(4, 4, 12, 0.99));
+            border: 1px solid rgba(0, 240, 255, 0.12);
+            border-radius: 16px;
+            padding: 32px 28px 24px 28px;
+            position: relative;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(0, 240, 255, 0.1);
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            backdrop-filter: blur(14px);
+            cursor: pointer;
+        }
+
+        .quote-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3.5px;
+            background: var(--card-glow-color, var(--accent-cyan));
+            box-shadow: 0 0 22px var(--card-glow-color, var(--accent-cyan));
+            opacity: 0.95;
+        }
+
+        .quote-card:hover {
+            transform: translateY(-8px) scale(1.01);
+            border-color: var(--card-glow-color, var(--accent-cyan));
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9), 0 0 35px var(--card-glow-color), inset 0 1px 0 rgba(0, 240, 255, 0.2);
+        }
+
+        .quote-card.highlight {
+            border-color: var(--accent-green) !important;
+            box-shadow: 0 0 45px rgba(0, 255, 102, 0.7);
+            animation: pulseGlow 1.5s infinite alternate;
+        }
+
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 20px rgba(0, 240, 255, 0.3); }
+            100% { box-shadow: 0 0 50px rgba(0, 255, 102, 0.85); }
+        }
+
+        .quote-id-badge {
+            position: absolute;
+            top: 16px;
+            right: 22px;
+            font-family: monospace;
+            font-size: 11px;
+            font-weight: bold;
+            letter-spacing: 1.5px;
+            padding: 3px 9px;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 240, 255, 0.15);
+            color: rgba(255, 255, 255, 0.8);
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);
+        }
+
+        .quote-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            font-family: monospace;
+            text-transform: uppercase;
+            padding: 4px 11px;
+            border-radius: 5px;
+            margin-bottom: 18px;
+            background: rgba(0, 240, 255, 0.04);
+            border: 1px solid rgba(0, 240, 255, 0.15);
+            letter-spacing: 1.5px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
+        }
+
+        .quote-text {
+            font-size: 15px;
+            line-height: 1.8;
+            color: #d8f5ff;
+            margin-bottom: 28px;
+            position: relative;
+            z-index: 1;
+            font-style: italic;
+        }
+
+        .quote-text::before {
+            content: "\f10d";
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            color: var(--card-glow-color, var(--accent-cyan));
+            margin-right: 10px;
+            font-size: 13px;
+            opacity: 0.9;
+            font-style: normal;
+        }
+
+        .quote-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid rgba(0, 240, 255, 0.08);
+            padding-top: 16px;
+            gap: 12px;
+        }
+
+        .quote-author {
+            font-family: monospace;
+            font-size: 12px;
+            color: #00f0ff;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+        }
+
+        .admin-controls {
+            display: none;
+            gap: 8px;
+        }
+
+        .btn-action-sm {
+            background: rgba(0, 0, 0, 0.35);
+            padding: 6px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-edit-quote {
+            border: 1px solid var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+        .btn-edit-quote:hover {
+            background: var(--accent-cyan);
+            color: #05050f;
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.7);
+        }
+
+        .btn-delete-quote {
+            border: 1px solid var(--accent-pink);
+            color: var(--accent-pink);
+        }
+        .btn-delete-quote:hover {
+            background: var(--accent-pink);
+            color: #fff;
+            box-shadow: 0 0 12px rgba(255, 0, 127, 0.7);
+        }
+
+        /* --- STYLISCHES BEARBEITUNGS-MODAL (EXTRA FENSTER) --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(2, 2, 8, 0.85);
+            backdrop-filter: blur(8px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 99999;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: linear-gradient(160deg, rgba(14, 14, 34, 0.98), rgba(5, 5, 15, 0.99));
+            border: 1px solid var(--accent-cyan);
+            border-radius: 14px;
+            padding: 30px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9), 0 0 30px rgba(0, 240, 255, 0.25);
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+            font-family: monospace;
+        }
+
+        .modal-overlay.active .modal-content {
+            transform: translateY(0);
+        }
+
+        .modal-content h3 {
+            color: var(--accent-cyan);
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 16px;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-group {
+            margin-bottom: 16px;
+            text-align: left;
+        }
+
+        .modal-group label {
+            display: block;
+            font-size: 11px;
+            color: #80a0b0;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .modal-input, .modal-select {
+            width: 100%;
+            background: #05050f;
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            color: #fff;
+            padding: 11px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+
+        .modal-input:focus, .modal-select:focus {
+            border-color: var(--accent-cyan);
+            outline: none;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 25px;
+        }
+
+        .btn-modal-save {
+            flex: 1;
+            background: var(--accent-cyan);
+            color: #05050f;
+            border: none;
+            padding: 12px;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .btn-modal-save:hover {
+            background: #00c0cc;
+            box-shadow: 0 0 25px var(--accent-cyan);
+        }
+
+        .btn-modal-cancel {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            color: #ccc;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 12px;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-modal-cancel:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+    </style>
+</head>
+<body style="background-color: var(--bg-color); color: #c0e0f0; font-family: monospace; margin: 0; padding: 0;">
+    <div class="grid-overlay"></div>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="logo">437<span>Studio</span></div>
+        <div class="menu-toggle"><i class="fas fa-bars"></i></div>
+        <ul class="nav-links">
+            <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="forum.html"><i class="fas fa-comments"></i> Forum</a></li>
+            <li><a href="games.html"><i class="fas fa-gamepad"></i> Games</a></li>
+            <li><a href="music.html"><i class="fas fa-music"></i> Musik</a></li>
+            <li><a href="discord.html"><i class="fab fa-discord"></i> Discord</a></li>
+            <li class="auth-container">
+                <div id="logged-out-zone">
+                    <button class="btn btn-neon-blue" onclick="redirectToLogin()">Login / Register</button>
+                </div>
+                <div id="logged-in-zone" class="hidden user-trigger" onclick="toggleProfileDropdown()">
+                    <img id="nav-avatar" src="" alt="Avatar">
+                    <span id="nav-username">User</span> 
+                    <span id="admin-badge" class="hidden" style="color:#ff007f; font-size:10px; border:1px solid #ff007f; padding:2px 4px; border-radius:4px; margin-left:5px;">ADMIN</span>
+                    <span id="dropdown-msg-badge" class="hidden"></span>
+                    <div id="profile-dropdown" class="dropdown-menu hidden"></div>
+                </div>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Header & Hauptbereich -->
+    <main style="margin-top: 45px; padding: 0 20px;">
+        <div style="text-align: center; margin-bottom: 35px;">
+            <h1 class="neon-text-blue" style="font-size: clamp(24px, 4vw, 38px); margin-bottom: 10px;"><i class="fas fa-cannabis"></i> Grünes Paradies Insider Zitate</h1>
+            <p style="color: #00f0ff; opacity: 0.8; font-size: 13px; letter-spacing: 2.5px; text-transform: uppercase; margin-bottom: 30px;">Weisheiten & organische Gedanken aus dem 76437</p>
+
+            <!-- Suchleiste, Sortierung & Zufalls-Button -->
+            <div class="matrix-toolbar">
+                <input type="text" id="quote-search" class="search-input" placeholder="Zitate oder Autoren durchsuchen..." oninput="applyMatrixFilters()">
+                
+                <select id="quote-sort" class="matrix-select" onchange="applyMatrixFilters()">
+                    <option value="newest">⚡ Neueste zuerst</option>
+                    <option value="oldest">⏳ Älteste zuerst</option>
+                    <option value="az">🔤 Alphabetisch (A-Z)</option>
+                    <option value="author">👤 Nach Autor</option>
+                </select>
+
+                <button onclick="triggerRandomQuote()" class="btn-matrix"><i class="fas fa-random"></i> Zufall</button>
+            </div>
+
+            <div class="matrix-stats" id="matrix-counter">Aktive Matrix-Zitate: 0</div>
+
+            <!-- Admin-Eingabe-Panel -->
+            <div id="admin-quote-panel">
+                <h3><i class="fas fa-shield-alt"></i> ADMIN-KONTROLLE: Neues Zitat mit Optionen erstellen</h3>
+                <div class="admin-form-row">
+                    <input type="text" id="new-quote-text" class="admin-input" placeholder="Zitat-Inhalt eingeben..." style="flex: 2;">
+                    <input type="text" id="new-quote-author" class="admin-input" placeholder="Autor / Quelle..." style="flex: 1;">
+                </div>
+                <div class="admin-form-row">
+                    <select id="new-quote-category" class="admin-select" style="flex: 1;">
+                        <option value="Cyber-Matrix">Kategorie: Cyber-Matrix</option>
+                        <option value="Weed">Kategorie: Weed</option>
+                        <option value="Netzwerk">Kategorie: Netzwerk</option>
+                        <option value="Philosophie">Kategorie: Philosophie</option>
+                    </select>
+
+                    <select id="new-quote-color" class="admin-select" style="flex: 1;">
+                        <option value="#00f0ff">Neon-Farbe: Cyan (Standard)</option>
+                        <option value="#00ff66">Neon-Farbe: Grün</option>
+                        <option value="#ff007f">Neon-Farbe: Pink</option>
+                        <option value="#ffd700">Neon-Farbe: Gold</option>
+                    </select>
+                </div>
+                <button onclick="addNewQuoteToCloud()" class="btn-admin-action"><i class="fas fa-plus"></i> Zitat in die Cloud schreiben</button>
+            </div>
+        </div>
+
+        <div class="container" id="quotes-container">
+            <div style="grid-column: 1 / -1; text-align: center; color: #708090;">Lade Bio-Matrix Zitate aus der Cloud...</div>
+        </div>
+
+        <div style="text-align: center; margin: 60px 0;">
+            <a href="index.html" class="btn btn-neon-blue" style="font-size: 13px; padding: 12px 30px;"><i class="fas fa-arrow-left"></i> Zurück zur Matrix</a>
+        </div>
+    </main>
+
+    <!-- EXTRA BEARBEITUNGS-FENSTER (MODAL) -->
+    <div id="edit-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3><i class="fas fa-edit"></i> Zitat bearbeiten</h3>
+            <input type="hidden" id="edit-quote-id">
+            
+            <div class="modal-group">
+                <label>Zitat-Inhalt</label>
+                <textarea id="edit-quote-text" class="modal-input" rows="3" style="resize: vertical;"></textarea>
+            </div>
+
+            <div class="modal-group">
+                <label>Autor / Quelle</label>
+                <input type="text" id="edit-quote-author" class="modal-input">
+            </div>
+
+            <div class="modal-group">
+                <label>Kategorie</label>
+                <select id="edit-quote-category" class="modal-select">
+                    <option value="Cyber-Matrix">Cyber-Matrix</option>
+                    <option value="Weed">Weed</option>
+                    <option value="Netzwerk">Netzwerk</option>
+                    <option value="Philosophie">Philosophie</option>
+                </select>
+            </div>
+
+            <div class="modal-group">
+                <label>Neon-Farbe</label>
+                <select id="edit-quote-color" class="modal-select">
+                    <option value="#00f0ff">Cyan (#00f0ff)</option>
+                    <option value="#00ff66">Grün (#00ff66)</option>
+                    <option value="#ff007f">Pink (#ff007f)</option>
+                    <option value="#ffd700">Gold (#ffd700)</option>
+                </select>
+            </div>
+
+            <div class="modal-actions">
+                <button onclick="saveEditedQuote()" class="btn-modal-save"><i class="fas fa-save"></i> Speichern</button>
+                <button onclick="closeEditModal()" class="btn-modal-cancel">Abbrechen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Globale Skripte -->
+    <script src="js/app.js"></script>
+    <script>
+        let isUserAdmin = false;
+        let globalQuotesCache = [];
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            checkAdminPermissions();
+            loadQuotesFromCloud();
+        });
+
+        function checkAdminPermissions() {
+            const session = localStorage.getItem("437_session");
+            if (!session) return;
+            try {
+                const userData = JSON.parse(session);
+                isUserAdmin = userData.is_admin === true || (userData.username && ["nalix437", "amnesia437"].includes(userData.username.toLowerCase()));
+                
+                if (isUserAdmin) {
+                    const panel = document.getElementById("admin-quote-panel");
+                    if (panel) panel.style.display = "block";
+                }
+            } catch (e) {
+                console.error("Fehler beim Prüfen der Admin-Rechte:", e);
+            }
+        }
+
+        async function loadQuotesFromCloud() {
+            const container = document.getElementById("quotes-container");
+            if (!container) return;
+
+            try {
+                if (typeof supabaseClient === "undefined" || !supabaseClient) {
+                    container.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: #ff0055;">Supabase-Client nicht initialisiert.</div>`;
+                    return;
+                }
+
+                const { data, error } = await supabaseClient
+                    .from("green_quotes")
+                    .select("*")
+                    .order("id", { ascending: true });
+
+                if (error) throw error;
+
+                if (!data || data.length === 0) {
+                    container.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: #708090;">Keine Zitate in der Bio-Matrix gefunden. Als Admin kannst du oben neue hinzufügen!</div>`;
+                    globalQuotesCache = [];
+                    updateCounter(0);
+                    return;
+                }
+
+                globalQuotesCache = data;
+                applyMatrixFilters();
+            } catch (err) {
+                console.warn("Fehler beim Laden der Zitate:", err);
+                container.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: #ff0055;">Verbindungsfehler zur Datenbank-Matrix.</div>`;
+            }
+        }
+
+        function applyMatrixFilters() {
+            const container = document.getElementById("quotes-container");
+            const searchQuery = document.getElementById("quote-search").value.toLowerCase().trim();
+            const sortMode = document.getElementById("quote-sort").value;
+            if (!container) return;
+
+            let processed = globalQuotesCache.filter(q => {
+                const text = (q.quote || q.content || "").toLowerCase();
+                const author = (q.author || "").toLowerCase();
+                const category = (q.category || "").toLowerCase();
+                return text.includes(searchQuery) || author.includes(searchQuery) || category.includes(searchQuery);
+            });
+
+            processed.sort((a, b) => {
+                if (sortMode === "newest") {
+                    return (b.id || 0) - (a.id || 0);
+                } else if (sortMode === "oldest") {
+                    return (a.id || 0) - (b.id || 0);
+                } else if (sortMode === "az") {
+                    const textA = (a.quote || a.content || "").toLowerCase();
+                    const textB = (b.quote || b.content || "").toLowerCase();
+                    return textA.localeCompare(textB);
+                } else if (sortMode === "author") {
+                    const authorA = (a.author || "").toLowerCase();
+                    const authorB = (b.author || "").toLowerCase();
+                    return authorA.localeCompare(authorB);
+                }
+                return 0;
+            });
+
+            renderQuotes(processed, container);
+            updateCounter(globalQuotesCache.length);
+        }
+
+        function renderQuotes(quotesList, container) {
+            container.innerHTML = "";
+            if (quotesList.length === 0) {
+                container.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: #708090;">Keine passenden Zitate gefunden.</div>`;
+                return;
+            }
+
+            quotesList.forEach((q, index) => {
+                const card = document.createElement("div");
+                card.className = "quote-card";
+                card.id = `quote-card-${q.id}`;
+                
+                // Klick auf die Karte triggert den neuen Erfolg (falls eingeloggt)
+                card.addEventListener("click", (e) => {
+                    // Verhindere, dass Klicks auf Admin-Buttons direkt das Achievement auslösen
+                    if (e.target.closest('.admin-controls')) return;
+                    handleQuoteCardClick();
+                });
+                
+                const formattedId = String(q.id).padStart(2, '0');
+
+                const customColor = q.color || "#00f0ff";
+                const category = q.category || "Cyber-Matrix";
+                card.style.setProperty('--card-glow-color', customColor);
+
+                const quoteText = q.quote || q.content || "";
+                const quoteAuthor = q.author || "Unbekannt";
+
+                card.innerHTML = `
+                    <div class="quote-id-badge" style="color: ${customColor}; border-color: ${customColor}44; background: ${customColor}11;">
+                        ${formattedId}
+                    </div>
+                    <div>
+                        <div class="quote-badge" style="color: ${customColor}; border-color: ${customColor}44; background: ${customColor}11;">
+                            <i class="fas fa-tag"></i> ${escapeHTML(category)}
+                        </div>
+                        <div class="quote-text">${escapeHTML(quoteText)}</div>
+                    </div>
+                    <div class="quote-footer">
+                        <div class="quote-author"><i class="fas fa-cannabis" style="color: ${customColor};"></i> ${escapeHTML(quoteAuthor)}</div>
+                        <div class="admin-controls" style="display: ${isUserAdmin ? 'flex' : 'none'};">
+                            <button onclick="openEditModal(${q.id}, '${escapeHTML(quoteText).replace(/'/g, "\\'")}', '${escapeHTML(quoteAuthor).replace(/'/g, "\\'")}', '${escapeHTML(category)}', '${customColor}')" class="btn-action-sm btn-edit-quote" title="Bearbeiten"><i class="fas fa-edit"></i></button>
+                            <button onclick="deleteQuoteFromCloud(${q.id})" class="btn-action-sm btn-delete-quote" title="Löschen"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // NEU: Logik für den Zitat-Erfolg
+        function handleQuoteCardClick() {
+            if (typeof currentUser === "undefined" || !currentUser) {
+                return; // Nur für eingeloggte User
+            }
+            if (typeof unlockAchievement === "function") {
+                unlockAchievement("quote_hunter");
+            }
+        }
+
+        function triggerRandomQuote() {
+            if (globalQuotesCache.length === 0) return;
+            
+            document.querySelectorAll(".quote-card").forEach(c => c.classList.remove("highlight"));
+
+            const randomIndex = Math.floor(Math.random() * globalQuotesCache.length);
+            const selected = globalQuotesCache[randomIndex];
+
+            const cardElement = document.getElementById(`quote-card-${selected.id}`);
+            if (cardElement) {
+                cardElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                cardElement.classList.add("highlight");
+                setTimeout(() => {
+                    cardElement.classList.remove("highlight");
+                }, 3000);
+            }
+        }
+
+        function updateCounter(count) {
+            const counterEl = document.getElementById("matrix-counter");
+            if (counterEl) {
+                counterEl.textContent = `Aktive Matrix-Zitate: ${count}`;
+            }
+        }
+
+        async function addNewQuoteToCloud() {
+            const textInput = document.getElementById("new-quote-text");
+            const authorInput = document.getElementById("new-quote-author");
+            const categorySelect = document.getElementById("new-quote-category");
+            const colorSelect = document.getElementById("new-quote-color");
+
+            const text = textInput ? textInput.value.trim() : "";
+            const author = authorInput ? authorInput.value.trim() : "";
+            const category = categorySelect ? categorySelect.value : "Cyber-Matrix";
+            const color = colorSelect ? colorSelect.value : "#00f0ff";
+
+            if (!text || !author) {
+                alert("Bitte sowohl Zitat als auch Autor eingeben.");
+                return;
+            }
+
+            if (typeof supabaseClient === "undefined" || !supabaseClient) {
+                alert("Supabase ist nicht verbunden.");
+                return;
+            }
+
+            try {
+                const { error } = await supabaseClient
+                    .from("green_quotes")
+                    .insert([{ quote: text, author: author, category: category, color: color }]);
+
+                if (error) throw error;
+
+                alert("✅ Zitat mit Optionen erfolgreich in der Cloud gespeichert!");
+                textInput.value = "";
+                authorInput.value = "";
+                loadQuotesFromCloud();
+            } catch (err) {
+                alert("❌ Fehler beim Speichern: " + err.message);
+            }
+        }
+
+        /* --- MODAL STEUERUNG --- */
+        function openEditModal(id, text, author, category, color) {
+            document.getElementById("edit-quote-id").value = id;
+            document.getElementById("edit-quote-text").value = text;
+            document.getElementById("edit-quote-author").value = author;
+            document.getElementById("edit-quote-category").value = category || "Cyber-Matrix";
+            document.getElementById("edit-quote-color").value = color || "#00f0ff";
+            
+            document.getElementById("edit-modal").classList.add("active");
+        }
+
+        function closeEditModal() {
+            document.getElementById("edit-modal").classList.remove("active");
+        }
+
+        async function saveEditedQuote() {
+            const id = document.getElementById("edit-quote-id").value;
+            const newText = document.getElementById("edit-quote-text").value.trim();
+            const newAuthor = document.getElementById("edit-quote-author").value.trim();
+            const newCategory = document.getElementById("edit-quote-category").value;
+            const newColor = document.getElementById("edit-quote-color").value;
+
+            if (!newText || !newAuthor) {
+                alert("Felder dürfen nicht leer sein.");
+                return;
+            }
+
+            try {
+                const { error } = await supabaseClient
+                    .from("green_quotes")
+                    .update({ 
+                        quote: newText, 
+                        author: newAuthor,
+                        category: newCategory,
+                        color: newColor
+                    })
+                    .eq("id", id);
+
+                if (error) throw error;
+
+                alert("✏️ Zitat erfolgreich aktualisiert!");
+                closeEditModal();
+                loadQuotesFromCloud();
+            } catch (err) {
+                alert("❌ Fehler beim Aktualisieren: " + err.message);
+            }
+        }
+
+        async function deleteQuoteFromCloud(quoteId) {
+            if (!confirm("Möchtest du dieses Zitat wirklich unwiderruflich löschen?")) return;
+
+            try {
+                const { error } = await supabaseClient
+                    .from("green_quotes")
+                    .delete()
+                    .eq("id", quoteId);
+
+                if (error) throw error;
+
+                alert("🗑️ Zitat erfolgreich gelöscht.");
+                loadQuotesFromCloud();
+            } catch (err) {
+                alert("❌ Fehler beim Löschen: " + err.message);
+            }
+        }
+
+        function escapeHTML(str) {
+            return String(str).replace(/[&<>'"]/g, 
+                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            );
+        }
+    </script>
+</body>
+</html>

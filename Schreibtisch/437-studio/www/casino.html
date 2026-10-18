@@ -1,0 +1,2400 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>437 Studio | Casino</title>
+    <link rel="icon" type="image/png" href="/img/logo.png">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/maintenance.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .casino-container {
+            max-width: 1100px;
+            margin: 90px auto 40px auto;
+            padding: 0 15px;
+            font-family: monospace;
+            box-sizing: border-box;
+        }
+        .casino-header {
+            background: linear-gradient(135deg, #0c180c 0%, #1a0a2a 100%);
+            border: 1px solid #00ff66;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 0 25px rgba(0, 255, 102, 0.2);
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .casino-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .casino-tab-btn {
+            background: #0c0c18;
+            border: 1px solid #333;
+            color: #888;
+            padding: 10px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+        .casino-tab-btn.active {
+            background: rgba(0, 255, 102, 0.15);
+            border-color: #00ff66;
+            color: #00ff66;
+            box-shadow: 0 0 12px rgba(0, 255, 102, 0.3);
+        }
+        .casino-tab-btn.hidden {
+            display: none !important;
+        }
+        .casino-game-panel {
+            display: none;
+            background: #0c0c18;
+            border: 1px solid #00f0ff;
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.15);
+            box-sizing: border-box;
+        }
+        .casino-game-panel.active {
+            display: block;
+        }
+        .manager-trigger-btn {
+            background: linear-gradient(135deg, rgba(255,0,127,0.2), rgba(0,240,255,0.2));
+            border: 1px solid #ff007f;
+            color: #ff007f;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 0 15px rgba(255,0,127,0.3);
+            transition: all 0.2s ease;
+        }
+        .manager-trigger-btn:hover {
+            background: rgba(255,0,127,0.4);
+            box-shadow: 0 0 20px rgba(255,0,127,0.6);
+        }
+        .manager-trigger-btn.hidden {
+            display: none !important;
+        }
+        .cyber-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(3, 3, 10, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            backdrop-filter: blur(8px);
+            animation: fadeInModal 0.3s ease;
+        }
+        .cyber-modal-overlay.hidden {
+            display: none !important;
+        }
+        @keyframes fadeInModal {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .cyber-modal-box {
+            background: linear-gradient(135deg, #0c0c18 0%, #1a0824 100%);
+            border: 2px solid #ff007f;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 440px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 0 50px rgba(255, 0, 127, 0.4), inset 0 0 20px rgba(255,0,127,0.1);
+            font-family: monospace;
+            position: relative;
+        }
+        .levelup-modal-box {
+            background: linear-gradient(135deg, #04140a 0%, #080314 100%);
+            border: 3px solid #00ff66;
+            border-radius: 16px;
+            padding: 40px 30px;
+            max-width: 480px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 0 70px rgba(0, 255, 102, 0.6), inset 0 0 30px rgba(0,255,102,0.2);
+            font-family: monospace;
+            position: relative;
+            animation: levelUpBounce 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes levelUpBounce {
+            0% { transform: scale(0.7); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .cyber-modal-close {
+            position: absolute;
+            top: 12px;
+            right: 15px;
+            background: transparent;
+            border: none;
+            color: #888;
+            font-size: 18px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .cyber-modal-close:hover {
+            color: #ff007f;
+        }
+
+        /* BOOK OF RA CARD GAMBLE (ERWEITERT & VOLLSTÄNDIG) */
+        .gamble-card-table {
+            background: #04140a;
+            border: 2px solid #ffd700;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            box-shadow: inset 0 0 20px rgba(255,215,0,0.2);
+        }
+        .gamble-history-strip {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            max-width: 100%;
+            padding-bottom: 4px;
+            justify-content: center;
+        }
+        .history-mini-card {
+            width: 32px;
+            height: 45px;
+            background: #fff;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+            flex-shrink: 0;
+        }
+        .gamble-card-display {
+            width: 75px;
+            height: 110px;
+            background: #fff;
+            color: #000;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 26px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 15px rgba(0,0,0,0.7);
+            border: 2px solid #333;
+        }
+        .gamble-card-display.card-back {
+            background: linear-gradient(135deg, #1a2a3a 0%, #0c1824 100%);
+            color: #ffd700;
+            border-color: #ffd700;
+            font-size: 28px;
+        }
+
+        /* Slots Multi-Column Area */
+        .slots-main-layout {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        /* 5x5 Slot Container & Grid Styling */
+        .slot-machine-container-5x5 {
+            flex: 1 1 480px;
+            background: #030805;
+            border: 2px solid #00ff66;
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: inset 0 0 30px rgba(0, 255, 102, 0.3), 0 0 20px rgba(0,255,102,0.2);
+            position: relative;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+        .slot-machine-grid-5x5 {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+        }
+        .slot-cell-5x5 {
+            height: 70px;
+            background: #050f08;
+            border: 1px solid #00ff66;
+            border-radius: 6px;
+            font-size: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 10px rgba(0, 255, 102, 0.15);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .slot-reel-strip {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: absolute;
+            width: 100%;
+            top: 0;
+            left: 0;
+        }
+        .slot-reel-item {
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            width: 100%;
+        }
+
+        @keyframes slotSpinning {
+            0% { transform: translateY(0); filter: blur(0px); }
+            50% { filter: blur(4px); }
+            100% { transform: translateY(-420px); filter: blur(0px); }
+        }
+        .spinning-anim {
+            animation: slotSpinning 0.35s linear infinite;
+        }
+
+        @keyframes reelBounceDrop {
+            0% { transform: translateY(-50px); opacity: 0; }
+            60% { transform: translateY(8px); opacity: 1; }
+            80% { transform: translateY(-3px); opacity: 1; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+        .slot-cell-5x5.drop-anim {
+            animation: reelBounceDrop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        .slot-cell-5x5.winning-glow {
+            border-color: #ffd700;
+            background: rgba(255, 215, 0, 0.25);
+            box-shadow: 0 0 20px #ffd700, inset 0 0 12px rgba(255,215,0,0.6);
+            transform: scale(1.06);
+            transition: all 0.3s ease;
+            animation: winPulse 0.5s infinite alternate;
+        }
+        @keyframes winPulse {
+            from { box-shadow: 0 0 12px #ffd700; }
+            to { box-shadow: 0 0 25px #ffd700, 0 0 10px #00ff66; }
+        }
+
+        /* Paytable Sidebar (Right Side) */
+        .paytable-sidebar {
+            flex: 0 0 260px;
+            background: #050a07;
+            border: 1px solid #00ff66;
+            border-radius: 8px;
+            padding: 12px;
+            box-sizing: border-box;
+            box-shadow: 0 0 15px rgba(0, 255, 102, 0.1);
+        }
+        .paytable-sidebar h4 {
+            color: #00ff66;
+            font-size: 12px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #1a3a24;
+            padding-bottom: 5px;
+        }
+        .paytable-sidebar-item {
+            background: #08140c;
+            border: 1px solid #1a3a24;
+            border-radius: 6px;
+            padding: 6px 8px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .paytable-sidebar-item .sym {
+            font-size: 22px;
+        }
+        .paytable-sidebar-item .values {
+            font-size: 10px;
+            color: #ffd700;
+            text-align: right;
+            line-height: 1.3;
+        }
+
+        .roulette-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 15px 0;
+            position: relative;
+        }
+        #roulette-canvas {
+            border-radius: 50%;
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.4);
+            background: #04040a;
+        }
+        .roulette-pointer {
+            position: absolute;
+            top: -5px;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 18px solid #ff0055;
+            z-index: 10;
+            filter: drop-shadow(0 0 5px #ff0055);
+        }
+        .bj-table {
+            background: #04140a;
+            border: 2px solid #00ff66;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 280px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: inset 0 0 30px rgba(0,255,102,0.1);
+        }
+        .card-row {
+            display: flex;
+            gap: 10px;
+            min-height: 70px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .playing-card {
+            width: 45px;
+            height: 65px;
+            background: #fff;
+            color: #000;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            animation: cardDealPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            transform-origin: bottom center;
+        }
+        @keyframes cardDealPop {
+            0% { transform: translateY(-40px) scale(0.5); opacity: 0; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        .crash-screen {
+            background: #05050e;
+            border: 2px solid #ffd700;
+            border-radius: 6px;
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .crash-multiplier {
+            font-size: 48px;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 0 0 20px rgba(255,215,0,0.5);
+            z-index: 2;
+        }
+        .crash-arrow {
+            position: absolute;
+            bottom: 15px;
+            left: 20px;
+            font-size: 35px;
+            color: #ffd700;
+            z-index: 1;
+            transition: transform 0.1s ease, font-size 0.1s ease;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+        }
+        .minefield-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            max-width: 320px;
+            margin: 20px auto;
+        }
+        .mine-tile {
+            background: #080814;
+            border: 2px solid #00f0ff;
+            border-radius: 6px;
+            height: 65px;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .mine-tile:hover {
+            border-color: #00ff66;
+            box-shadow: 0 0 10px rgba(0,255,102,0.4);
+            transform: scale(1.03);
+        }
+        .mine-tile.revealed {
+            background: #04040a;
+            border-color: #333;
+            cursor: default;
+            transform: none;
+            box-shadow: none;
+        }
+        .casino-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(3, 3, 8, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            backdrop-filter: blur(5px);
+        }
+        .casino-modal.hidden {
+            display: none;
+        }
+        .casino-modal-content {
+            background: #0c0c18;
+            border: 2px solid #ff0055;
+            border-radius: 8px;
+            padding: 30px;
+            max-width: 360px;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(255, 0, 85, 0.5);
+            font-family: monospace;
+        }
+        #casino-ban-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #030308;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 999999;
+            font-family: monospace;
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        #casino-ban-screen.hidden {
+            display: none !important;
+        }
+        .ban-box {
+            background: #0c0c18;
+            border: 2px solid #ff0055;
+            border-radius: 10px;
+            padding: 40px;
+            max-width: 500px;
+            box-shadow: 0 0 50px rgba(255, 0, 85, 0.4);
+        }
+        @keyframes screenShake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            40% { transform: translate(1px, -1px) rotate(-1deg); }
+            60% { transform: translate(-1px, 2px) rotate(0deg); }
+            80% { transform: translate(-3px, 1px) rotate(-1deg); }
+            100% { transform: translate(1px, -2px) rotate(1deg); }
+        }
+        .shake-effect {
+            animation: screenShake 0.4s ease;
+        }
+        @media(max-width: 768px) {
+            .casino-container { margin-top: 80px; padding: 0 10px; }
+            .slot-cell-5x5 { height: 50px; font-size: 24px; }
+            .slot-reel-item { height: 50px; font-size: 24px; }
+            .paytable-sidebar { flex: 1 1 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="grid-overlay"></div>
+
+    <!-- BOOK OF RA GAMBLE MODAL (ERWEITERT MIT HISTORIE & KARTEN) -->
+    <div id="gamble-modal" class="cyber-modal-overlay hidden">
+        <div class="cyber-modal-box" style="border-color: #ffd700; box-shadow: 0 0 50px rgba(255,215,0,0.4);">
+            <button onclick="closeGambleModal()" class="cyber-modal-close"><i class="fas fa-times"></i></button>
+            <div style="font-size: 36px; color: #ffd700; margin-bottom: 8px; text-shadow: 0 0 20px #ffd700;">
+                <i class="fas fa-playing-cards"></i>
+            </div>
+            <h2 style="color: #ffd700; font-size: 16px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;">Karten-Risiko (Gamble)</h2>
+            <p style="color: #ccc; font-size: 11px; margin-bottom: 8px;">
+                Aktueller Gewinn: <span id="gamble-win-amount" style="color: #00ff66; font-weight: bold;">0</span> Chips
+            </p>
+
+            <div class="gamble-card-table">
+                <!-- Letzte gezogene Karten Leiste (Book of Ra Stil) -->
+                <div style="width: 100%;">
+                    <div style="font-size: 9px; color: #888; margin-bottom: 3px; text-transform: uppercase;">Zuletzt gezogene Karten:</div>
+                    <div id="gamble-history-strip" class="gamble-history-strip">
+                        <div class="history-mini-card" style="background:#222; color:#666;">-</div>
+                        <div class="history-mini-card" style="background:#222; color:#666;">-</div>
+                        <div class="history-mini-card" style="background:#222; color:#666;">-</div>
+                        <div class="history-mini-card" style="background:#222; color:#666;">-</div>
+                        <div class="history-mini-card" style="background:#222; color:#666;">-</div>
+                    </div>
+                </div>
+
+                <div id="gamble-card-container" class="gamble-card-display card-back">
+                    <i class="fas fa-question"></i>
+                </div>
+                <div id="gamble-result-display" style="font-size: 11px; font-weight: bold; color: #ffd700; min-height: 18px;">Wähle Rot oder Schwarz</div>
+            </div>
+
+            <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 15px;">
+                <button onclick="chooseGambleCard('red')" class="btn" style="background: rgba(255,0,85,0.2); border: 2px solid #ff0055; color: #ff0055; font-size: 12px; padding: 10px 20px; font-weight: bold; cursor: pointer; border-radius: 6px; flex: 1;">
+                    <i class="fas fa-heart"></i> ROT
+                </button>
+                <button onclick="chooseGambleCard('black')" class="btn" style="background: rgba(255,255,255,0.1); border: 2px solid #fff; color: #fff; font-size: 12px; padding: 10px 20px; font-weight: bold; cursor: pointer; border-radius: 6px; flex: 1;">
+                    <i class="fas fa-spade"></i> SCHWARZ
+                </button>
+            </div>
+
+            <button onclick="collectGambleWin()" class="btn btn-neon-green" style="width: 100%; padding: 10px; font-size: 11px; cursor: pointer;">
+                💰 Gewinn einsammeln (Collect)
+            </button>
+        </div>
+    </div>
+
+    <div id="casino-levelup-modal" class="cyber-modal-overlay hidden">
+        <div class="levelup-modal-box">
+            <button onclick="closeLevelUpModal()" class="cyber-modal-close"><i class="fas fa-times"></i></button>
+            <div style="font-size: 55px; color: #00ff66; margin-bottom: 15px; text-shadow: 0 0 25px #00ff66;">
+                <i class="fas fa-level-up-alt"></i>
+            </div>
+            <h2 style="color: #00ff66; font-size: 20px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px;">NEUE STUFE ERREICHT!</h2>
+            <div id="levelup-modal-title" style="color: #ffd700; font-size: 16px; font-weight: bold; margin-bottom: 15px;">STUFE X</div>
+            <p id="levelup-modal-desc" style="color: #ccc; font-size: 12px; line-height: 1.6; margin-bottom: 25px;">
+                Dein Einsatzlimit wurde erfolgreich erhöht!
+            </p>
+            <button onclick="closeLevelUpModal()" class="btn btn-neon-green" style="font-size: 12px; padding: 12px 25px; width: 100%; cursor: pointer; font-weight: bold; border-radius: 6px;">
+                <i class="fas fa-bolt"></i> Weiter zocken
+            </button>
+        </div>
+    </div>
+
+    <div id="amnesia-manager-modal" class="cyber-modal-overlay hidden">
+        <div class="cyber-modal-box">
+            <button onclick="closeAmnesiaManagerModal()" class="cyber-modal-close"><i class="fas fa-times"></i></button>
+            <div style="font-size: 45px; color: #ff007f; margin-bottom: 15px; text-shadow: 0 0 20px #ff007f;">
+                <i class="fas fa-id-badge"></i>
+            </div>
+            <h2 style="color: #ff007f; font-size: 18px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px;">Amnesia437 Manager</h2>
+            <p style="color: #ccc; font-size: 12px; line-height: 1.6; margin-bottom: 25px;">
+                "Willkommen Operator! Für treue Fans gibt es Starter Bonus+."
+            </p>
+            <div style="background: rgba(255,0,127,0.1); border: 1px solid #ff007f; border-radius: 6px; padding: 12px; margin-bottom: 25px;">
+                <span style="color: #ffd700; font-size: 16px; font-weight: bold;">🪙 5.000 CHIPS</span>
+            </div>
+            <button onclick="claimAmnesiaManagerReward()" class="btn" style="background: linear-gradient(135deg, #ff007f, #00f0ff); border: none; color: #fff; font-size: 12px; padding: 12px 25px; width: 100%; cursor: pointer; font-weight: bold; border-radius: 6px; box-shadow: 0 0 15px rgba(255,0,127,0.5);">
+                <i class="fas fa-gift"></i> Belohnung Jetzt Abholen
+            </button>
+        </div>
+    </div>
+
+    <div id="casino-ban-screen" class="hidden">
+        <div class="ban-box">
+            <i class="fas fa-skull-crossbones" style="font-size: 60px; color: #ff0055; margin-bottom: 20px; text-shadow: 0 0 20px #ff0055;"></i>
+            <h1 style="color: #ff007f; font-size: 22px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 2px;">ZUGRIFF VERWEIGERT</h1>
+            <p style="color: #fff; font-size: 14px; margin-bottom: 15px; font-weight: bold;">CASINO-SPERRE AKTIV</p>
+            <p style="color: #aaa; font-size: 12px; line-height: 1.6; margin-bottom: 25px;">Operator, dein Account wurde von der Admin wegen Sicherheitsrisiken oder Betrug gesperrt.</p>
+            <a href="index.html" class="btn btn-neon-blue" style="padding: 10px 20px; font-size: 12px; text-decoration: none; display: inline-block;">Zurück zum Nexus</a>
+        </div>
+    </div>
+
+    <div id="low-chips-modal" class="casino-modal hidden">
+        <div class="casino-modal-content">
+            <i class="fas fa-exclamation-triangle" style="font-size: 40px; color: #ff0055; margin-bottom: 15px; text-shadow: 0 0 15px #ff0055;"></i>
+            <h3 style="color: #ff0055; font-size: 18px; margin-bottom: 10px; text-transform: uppercase;">Kritischer Mangel!</h3>
+            <p id="modal-warning-text" style="color: #ccc; font-size: 12px; margin-bottom: 20px; line-height: 1.5;">Operator, dein Guthaben reicht nicht aus oder das Einsatzlimit wurde überschritten!</p>
+            <button onclick="closeLowChipsModal()" class="btn btn-neon-pink" style="padding: 10px 25px; font-size: 12px; cursor: pointer;">Verstanden</button>
+        </div>
+    </div>
+
+    <nav class="navbar">
+        <div class="logo">437<span>Studio</span></div>
+        <div class="menu-toggle"><i class="fas fa-bars"></i></div>
+        <ul class="nav-links">
+            <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="forum.html"><i class="fas fa-comments"></i> Forum</a></li>
+            <li><a href="games.html"><i class="fas fa-gamepad"></i> Games</a></li>
+            <li><a href="mitglieder.html"><i class="fas fa-users"></i> Mitglieder</a></li>  
+            <li><a href="music.html"><i class="fas fa-music"></i> Musik</a></li>
+            <li><a href="discord.html"><i class="fab fa-discord"></i> Discord</a></li>
+            <li class="auth-container">
+                <div id="logged-out-zone">
+                    <button class="btn btn-neon-blue" onclick="redirectToLogin()">Login / Register</button>
+                </div>
+                <div id="logged-in-zone" class="hidden user-trigger" onclick="toggleProfileDropdown()">
+                    <img id="nav-avatar" src="" alt="Avatar">
+                    <span id="nav-username">User</span> 
+                    <span id="admin-badge" class="hidden" style="color:#ff007f; font-size:10px; border:1px solid #ff007f; padding:2px 4px; border-radius:4px; margin-left:5px;">ADMIN</span>
+                    <span id="dropdown-msg-badge" class="hidden"></span>
+                    <div id="profile-dropdown" class="dropdown-menu hidden"></div>
+                </div>
+            </li>
+        </ul>
+    </nav>
+    <div id="ticker-insertion-point"></div>
+
+    <main class="casino-container" id="main-casino-box">
+        <div class="casino-header">
+            <div>
+                <h1 style="color: #00ff66; font-size: 22px; margin-bottom: 4px; text-transform: uppercase; text-shadow: 0 0 10px rgba(0,255,102,0.4);"><i class="fas fa-cannabis"></i> Cyber Weed Casino Matrix</h1>
+                <p style="color: #888; font-size: 11px;">Das Ultimative 437 Casino</p>
+                <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span id="casino-rank-badge" style="background: rgba(0,240,255,0.15); border: 1px solid #00f0ff; color: #00f0ff; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">STUFE 1 (Limit: 1.000)</span>
+                    <span id="casino-rank-progress" style="color: #aaa; font-size: 10px;">(0 / 150 Runden bis Stufe 2)</span>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <button id="manager-trigger-btn" onclick="openAmnesiaManagerModal()" class="manager-trigger-btn hidden">
+                    <i class="fas fa-user-tie"></i> Amnesia437 Manager
+                </button>
+
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px; background: #050f08; border: 1px solid #00ff66; padding: 10px 15px; border-radius: 6px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="font-size: 9px; color: #888; text-transform: uppercase;">Guthaben:</div>
+                        <div id="casino-chips-display" style="color: #ffd700; font-weight: bold; font-size: 16px;">🪙 1,000 Chips</div>
+                    </div>
+                    <div style="font-size: 10px; color: #00ff66;">
+                        <i class="fas fa-clock"></i> Nächste 25 Chips in: <span id="faucet-timer-display" style="font-weight: bold;">15:00</span>
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <button onclick="manualSaveCasinoData()" class="btn btn-neon-green" style="font-size: 10px; padding: 8px 12px; cursor: pointer;">
+                        <i class="fas fa-save"></i> Speichern
+                    </button>
+                    <button onclick="toggleAudioMute()" id="audio-toggle-btn" class="btn" style="background: #080814; border: 1px solid #00f0ff; color: #00f0ff; font-size: 10px; padding: 6px 12px; cursor: pointer;">
+                        <i class="fas fa-volume-up"></i> Sound AN
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="casino-tabs">
+            <button onclick="switchCasinoTab('slots', event)" class="casino-tab-btn active"><i class="fas fa-cannabis"></i> Weed Slots</button>
+            <button onclick="switchCasinoTab('blackjack', event)" class="casino-tab-btn"><i class="fas fa-playing-cards"></i> Blackjack</button>
+            <button onclick="switchCasinoTab('roulette', event)" class="casino-tab-btn"><i class="fas fa-circle-notch"></i> Matrix Roulette</button>
+            <button onclick="switchCasinoTab('crash', event)" class="casino-tab-btn"><i class="fas fa-chart-line"></i> Cyber Crash</button>
+            <button onclick="switchCasinoTab('dice', event)" class="casino-tab-btn"><i class="fas fa-dice"></i> Cyber Dice</button>
+            <button onclick="switchCasinoTab('minefield', event)" class="casino-tab-btn"><i class="fas fa-bomb"></i> Minefield</button>
+            <button onclick="switchCasinoTab('leaderboard', event)" class="casino-tab-btn"><i class="fas fa-trophy"></i> Highroller Board</button>
+            <button id="admin-tab-btn" onclick="switchCasinoTab('admin', event)" class="casino-tab-btn hidden" style="border-color: #ff007f; color: #ff007f;"><i class="fas fa-shield-alt"></i> Admin Matrix</button>
+        </div>
+
+        <!-- 5x5 WEED SLOTS PANEL WITH RIGHT SIDE PAYTABLE -->
+        <div id="panel-slots" class="casino-game-panel active">
+            <h3 style="color: #00ff66; font-size: 15px; margin-bottom: 5px;"><i class="fas fa-cannabis"></i> 437 Weed Book Slots (Real Automaten-Linien)</h3>
+            <p id="slot-mode-desc" style="color: #aaa; font-size: 11px; margin-bottom: 12px;">
+                Gewinne entstehen nur bei 3, 4 oder 5 gleichen Symbolen in einer Linie. Freispiele (10x) starten ausschließlich bei 5 Diamanten (💎) in einer Linie!
+            </p>
+            
+            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;">
+                <div>
+                    <label style="font-size: 11px; color: #ccc;">Einsatz (Max. <span id="limit-label-slots">1000</span>):</label>
+                    <input type="number" id="slot-bet" value="50" min="10" max="1000" oninput="updatePaytableDisplay()" style="background: #05050e; border: 1px solid #333; color: #fff; padding: 6px; width: 100px; border-radius: 4px; font-family: monospace;">
+                </div>
+                <div id="freespins-status-badge" style="font-size: 11px; color: #ffd700; font-weight: bold; background: rgba(255,215,0,0.1); border: 1px solid #ffd700; padding: 4px 8px; border-radius: 4px; display: none;">
+                    🎁 FREISPIELE AKTIV: <span id="freespins-left">0</span> übrig (Bitte manuell drehen!)
+                </div>
+            </div>
+
+            <!-- MAIN SLOTS & SIDEBAR CONTAINER -->
+            <div class="slots-main-layout">
+                <div class="slot-machine-container-5x5">
+                    <div class="slot-machine-grid-5x5" id="slot-grid-5x5"></div>
+                </div>
+
+                <!-- PAYTABLE ON THE RIGHT SIDE -->
+                <div class="paytable-sidebar">
+                    <h4><i class="fas fa-coins"></i> Symbol Gewinne</h4>
+                    <div id="paytable-list"></div>
+                </div>
+            </div>
+
+            <div id="slot-message" style="text-align: center; color: #00ff66; font-weight: bold; font-size: 14px; margin: 12px 0; min-height: 24px;">Bereit zum Dreh</div>
+
+            <div style="display: flex; gap: 10px;">
+                <button id="slot-spin-btn" onclick="spinSlotsRealEngine()" class="btn btn-neon-green" style="flex: 2; padding: 12px; font-size: 13px; cursor: pointer;">
+                    <i class="fas fa-sync-alt"></i> Spin
+                </button>
+                <button id="slot-gamble-btn" onclick="openGambleModal()" class="btn btn-neon-pink hidden" style="flex: 1; padding: 12px; font-size: 12px; cursor: pointer;">
+                    ⚡ Risiko (Rot/Schwarz)
+                </button>
+            </div>
+        </div>
+
+        <div id="panel-blackjack" class="casino-game-panel">
+            <h3 style="color: #00ff66; font-size: 15px; margin-bottom: 10px;"><i class="fas fa-playing-cards"></i> Quantum Blackjack</h3>
+            <p style="color: #aaa; font-size: 11px; margin-bottom: 15px;">Schlage den Dealer. Einsatzlimit: <span id="limit-label-bj">1000</span> Chips.</p>
+
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
+                <label style="font-size: 11px; color: #ccc;">Einsatz:</label>
+                <input type="number" id="bj-bet" value="100" min="10" max="1000" style="background: #05050e; border: 1px solid #333; color: #fff; padding: 6px; width: 100px; border-radius: 4px; font-family: monospace;">
+                <button id="bj-start-btn" onclick="startBlackjack()" class="btn btn-neon-green" style="font-size: 11px; padding: 6px 15px; cursor: pointer;">Spiel starten</button>
+            </div>
+
+            <div class="bj-table">
+                <div>
+                    <div style="color: #aaa; font-size: 11px; margin-bottom: 5px;">Dealer Hand (<span id="dealer-score">0</span>):</div>
+                    <div id="dealer-cards" class="card-row"></div>
+                </div>
+                <div id="bj-status-msg" style="text-align: center; color: #ffd700; font-weight: bold; font-size: 13px;">Warte auf Einsatz...</div>
+                <div>
+                    <div style="color: #aaa; font-size: 11px; margin-bottom: 5px;">Deine Hand (<span id="player-score">0</span>):</div>
+                    <div id="player-cards" class="card-row"></div>
+                </div>
+            </div>
+
+            <div id="bj-actions" style="display: none; gap: 10px; margin-top: 15px;">
+                <button onclick="bjHit()" class="btn btn-neon-blue" style="flex: 1; padding: 10px; cursor: pointer;">Karte ziehen (Hit)</button>
+                <button onclick="bjStand()" class="btn btn-neon-pink" style="flex: 1; padding: 10px; cursor: pointer;">Halten (Stand)</button>
+                <button id="bj-double-btn" onclick="bjDoubleDown()" class="btn btn-neon-green" style="flex: 1; padding: 10px; cursor: pointer;">Verdoppeln (x2)</button>
+            </div>
+        </div>
+
+        <div id="panel-roulette" class="casino-game-panel">
+            <h3 style="color: #00f0ff; font-size: 15px; margin-bottom: 10px;"><i class="fas fa-circle-notch"></i> Matrix Roulette</h3>
+            <p style="color: #aaa; font-size: 11px; margin-bottom: 15px;">Setze auf Farben. Einsatzlimit: <span id="limit-label-roulette">1000</span> Chips.</p>
+
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
+                <div>
+                    <label style="font-size: 11px; color: #ccc;">Einsatz:</label>
+                    <input type="number" id="roulette-bet" value="50" min="10" max="1000" style="background: #05050e; border: 1px solid #333; color: #fff; padding: 6px; width: 90px; border-radius: 4px; font-family: monospace;">
+                </div>
+                <div>
+                    <label style="font-size: 11px; color: #ccc;">Wahl:</label>
+                    <select id="roulette-choice" style="background: #05050e; border: 1px solid #333; color: #fff; padding: 7px; border-radius: 4px; font-family: monospace;">
+                        <option value="red">Rot (Reduziert)</option>
+                        <option value="black">Schwarz (Reduziert)</option>
+                        <option value="green">Grün / 0 (Reduziert)</option>
+                    </select>
+                </div>
+                <button id="roulette-spin-btn" onclick="spinRouletteWheel()" class="btn btn-neon-blue" style="padding: 8px 20px; font-size: 11px; cursor: pointer;">Kessel drehen</button>
+            </div>
+
+            <div class="roulette-wrapper">
+                <div class="roulette-pointer"></div>
+                <canvas id="roulette-canvas" width="220" height="220"></canvas>
+            </div>
+
+            <div id="roulette-result-box" style="text-align: center; background: #05050e; border: 1px solid #00f0ff; padding: 12px; border-radius: 6px; font-size: 15px; font-weight: bold; color: #fff; margin-top: 15px;">
+                Bereit für den Dreh
+            </div>
+        </div>
+
+        <div id="panel-crash" class="casino-game-panel">
+            <h3 style="color: #ffd700; font-size: 15px; margin-bottom: 10px;"><i class="fas fa-chart-line"></i> Cyber Crash Multiplier</h3>
+            <p style="color: #aaa; font-size: 11px; margin-bottom: 15px;">Einsatzlimit: <span id="limit-label-crash">1000</span> Chips.</p>
+
+            <div class="crash-screen">
+                <div id="crash-arrow" class="crash-arrow"><i class="fas fa-arrow-up"></i></div>
+                <div id="crash-multiplier-display" class="crash-multiplier">1.00x</div>
+            </div>
+
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
+                <div>
+                    <label style="font-size: 11px; color: #ccc;">Einsatz:</label>
+                    <input type="number" id="crash-bet" value="100" min="10" max="1000" style="background: #05050e; border: 1px solid #333; color: #fff; padding: 6px; width: 90px; border-radius: 4px; font-family: monospace;">
+                </div>
+                <div>
+                    <label style="font-size: 11px; color: #ccc;">Auto-Cashout:</label>
+                    <input type="number" id="crash-autocash" value="1.40" step="0.1" min="1.1" max="10" style="background: #05050e; border: 1px solid #333; color: #fff; padding: 6px; width: 80px; border-radius: 4px; font-family: monospace;">
+                </div>
+                
+                <button id="crash-start-btn" onclick="startCrash()" class="btn btn-neon-green" style="padding: 8px 20px; font-size: 11px; cursor: pointer;">Runde starten</button>
+                <button id="crash-cashout-btn" onclick="cashoutCrash()" class="btn btn-neon-pink hidden" style="padding: 8px 20px; font-size: 11px; cursor: pointer;">Cash Out</button>
+            </div>
+        </div>
+
+        <div id="panel-dice" class="casino-game-panel">
+            <h3 style="color: #00f0ff; font-size: 15px; margin-bottom: 10px;"><i class="fas fa-dice"></i> Cyber Dice</h3>
+            <p style="color: #aaa; font-size: 11px; margin-bottom: 15px;">Einsatzlimit: <span id="limit-label-dice">1000</span> Chips.</p>
+
+            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;">
+                <div>
+                    <label style="font-size: 11px; color: #ccc;">Einsatz:</label>
+                    <input type="number" id="dice-bet" value="50" min="10" max="1000" style="background: #05050e; border: 1px solid #333; color: #fff; padding: 6px; width: 90px; border-radius: 4px; font-family: monospace;">
+                </div>
+                <div>
+                    <label style="font-size: 11px; color: #ccc;">Vorhersage:</label>
+                    <select id="dice-cond" style="background: #05050e; border: 1px solid #333; color: #fff; padding: 7px; border-radius: 4px; font-family: monospace;">
+                        <option value="under">Unter 30 (Reduziert)</option>
+                        <option value="over">Über 70 (Reduziert)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="text-align: center; background: #05050e; border: 2px solid #00f0ff; border-radius: 8px; padding: 25px; margin-bottom: 20px;">
+                <div id="dice-result-display" style="font-size: 45px; font-weight: bold; color: #ffd700; text-shadow: 0 0 15px rgba(255,215,0,0.4);">🎲 50</div>
+                <div id="dice-msg" style="color: #00f0ff; font-size: 13px; margin-top: 10px; font-weight: bold;">Bereit zum Würfeln</div>
+            </div>
+
+            <button id="dice-roll-btn" onclick="rollCyberDice()" class="btn btn-neon-blue" style="width: 100%; padding: 12px; font-size: 13px; cursor: pointer;">
+                <i class="fas fa-dice"></i> Würfel werfen
+            </button>
+        </div>
+
+        <div id="panel-minefield" class="casino-game-panel">
+            <h3 style="color: #ff0055; font-size: 15px; margin-bottom: 10px;"><i class="fas fa-bomb"></i> Matrix Minefield</h3>
+            <p style="color: #aaa; font-size: 11px; margin-bottom: 15px;">Einsatzlimit: <span id="limit-label-mine">1000</span> Chips.</p>
+
+            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
+                <div>
+                    <label style="font-size: 11px; color: #ccc;">Einsatz:</label>
+                    <input type="number" id="mine-bet" value="50" min="10" max="1000" style="background: #05050e; border: 1px solid #333; color: #fff; padding: 6px; width: 90px; border-radius: 4px; font-family: monospace;">
+                </div>
+                <button id="mine-start-btn" onclick="startMinefield()" class="btn btn-neon-green" style="padding: 8px 20px; font-size: 11px; cursor: pointer;">Spiel starten</button>
+                <div id="mine-status" style="color: #ffd700; font-weight: bold; font-size: 13px;">Multiplikator: 1.00x</div>
+            </div>
+
+            <div class="minefield-grid" id="minefield-grid-container"></div>
+
+            <button id="mine-cashout-btn" onclick="cashoutMinefield()" class="btn btn-neon-pink hidden" style="width: 100%; padding: 12px; font-size: 12px; cursor: pointer; margin-top: 10px;">
+                💰 Gewinn sichern (Cash Out)
+            </button>
+        </div>
+
+        <div id="panel-leaderboard" class="casino-game-panel">
+            <h3 style="color: #00ff66; font-size: 15px; margin-bottom: 15px;"><i class="fas fa-trophy"></i> Casino Highroller Bestenliste</h3>
+            <div id="casino-leaderboard-list">
+                <div style="text-align: center; color: #666; padding: 20px;">Lade Highroller-Daten...</div>
+            </div>
+        </div>
+
+        <div id="panel-admin" class="casino-game-panel">
+            <h3 style="color: #ff007f; font-size: 15px; margin-bottom: 15px;"><i class="fas fa-shield-alt"></i> Admin Casino-Bearbeitungsfenster</h3>
+            <p style="color: #aaa; font-size: 11px; margin-bottom: 15px;">Verwalte Guthaben, Stufen und Sperren.</p>
+            
+            <div style="background: #05050e; border: 1px solid #ff007f; border-radius: 6px; padding: 15px; max-height: 400px; overflow-y: auto;">
+                <h4 style="color: #00f0ff; font-size: 13px; margin-bottom: 10px; text-transform: uppercase;"><i class="fas fa-users-cog"></i> Operator Konten-Matrix</h4>
+                <div id="admin-operator-list">
+                    <div style="color: #666; text-align: center; padding: 15px;">Lade Operator-Daten...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/app.js"></script>
+    <script>
+        const ANTI_CHEAT_SALT = "437_MATRIX_SECURE_SALT_9981";
+        
+        async function generateChecksum(chips, rounds) {
+            const text = `${chips}:${rounds}:${ANTI_CHEAT_SALT}`;
+            const msgBuffer = new TextEncoder().encode(text);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        let casinoChips = 1000;
+        let lastTimestamp = Date.now();
+        const INTERVAL_TIME = 15 * 60 * 1000;
+        const CHIPS_REWARD = 25;
+        let soundMuted = false;
+        let lastSlotWinAmount = 0;
+        let freeSpinsRemaining = 0;
+        let gambleHistoryCards = [];
+
+        let casinoRoundsPlayed = 0;
+        let casinoRankLevel = 1;
+        let casinoBetLimit = 1000;
+
+        const rankLimits = {
+            1: 1000, 2: 2000, 3: 3000, 4: 3500, 5: 4000,
+            6: 4500, 7: 5000, 8: 5500, 9: 6000, 10: 6000
+        };
+
+        function getRequiredRoundsForLevel(lvl) {
+            let total = 0;
+            let current = 150;
+            for (let i = 1; i < lvl; i++) {
+                total += current;
+                current *= 2;
+            }
+            return total;
+        }
+
+        function calculateLevelFromRounds(rounds) {
+            let lvl = 1;
+            while (lvl < 10) {
+                let nextThreshold = getRequiredRoundsForLevel(lvl + 1);
+                if (rounds >= nextThreshold) {
+                    lvl++;
+                } else {
+                    break;
+                }
+            }
+            return lvl;
+        }
+
+        function getRoundsNeededForNextLevel(lvl, rounds) {
+            if (lvl >= 10) return 0;
+            let targetTotal = getRequiredRoundsForLevel(lvl + 1);
+            return targetTotal - rounds;
+        }
+
+        let lastActionTime = 0;
+        const SPAM_COOLDOWN_MS = 600;
+
+        function checkSpamCooldown() {
+            let now = Date.now();
+            if (now - lastActionTime < SPAM_COOLDOWN_MS) {
+                console.warn("Anti-Cheat: Zu schnelle Aktion abgefangen.");
+                return false;
+            }
+            lastActionTime = now;
+            return true;
+        }
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playCasinoSound(type) {
+            if (soundMuted || !audioCtx) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            let now = audioCtx.currentTime;
+            if (type === 'click') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 0.05);
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            } else if (type === 'win') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.setValueAtTime(500, now + 0.1);
+                osc.frequency.setValueAtTime(700, now + 0.2);
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            } else if (type === 'lose') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(160, now);
+                osc.frequency.exponentialRampToValueAtTime(70, now + 0.25);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            } else if (type === 'open') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(520, now);
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            } else if (type === 'close') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, now);
+                osc.frequency.exponentialRampToValueAtTime(400, now + 0.15);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            } else if (type === 'claim') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.setValueAtTime(600, now + 0.1);
+                osc.frequency.setValueAtTime(900, now + 0.2);
+                osc.frequency.setValueAtTime(1200, now + 0.3);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+        }
+
+        function toggleAudioMute() {
+            soundMuted = !soundMuted;
+            const btn = document.getElementById("audio-toggle-btn");
+            if (btn) {
+                btn.innerHTML = soundMuted ? '<i class="fas fa-volume-mute"></i> Sound AUS' : '<i class="fas fa-volume-up"></i> Sound AN';
+                btn.style.borderColor = soundMuted ? '#ff0055' : '#00f0ff';
+                btn.style.color = soundMuted ? '#ff0055' : '#00f0ff';
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            await loadCasinoData();
+            checkAdminAccessUI();
+            checkAmnesiaManagerStatus();
+            drawRouletteWheel(0);
+            renderSlotGrid5x5Initial();
+            updatePaytableDisplay();
+            renderMinefieldGridInitial();
+            updateRankUI();
+            setInterval(casinoTicker, 1000);
+
+            window.addEventListener("beforeunload", () => {
+                saveCasinoData();
+            });
+        });
+
+        function validateBetAmount(bet) {
+            if (isNaN(bet) || bet <= 0) {
+                alert("Ungültiger Einsatz.");
+                return false;
+            }
+            if (bet > casinoBetLimit) {
+                const modalText = document.getElementById("modal-warning-text");
+                if (modalText) modalText.textContent = `Limit-Schutz (Stufe ${casinoRankLevel}): Der maximale Einsatz ist auf ${casinoBetLimit.toLocaleString()} Chips begrenzt!`;
+                document.getElementById("low-chips-modal").classList.remove("hidden");
+                playCasinoSound('lose');
+                return false;
+            }
+            return true;
+        }
+
+        function recordRoundPlayed() {
+            casinoRoundsPlayed++;
+            let calculatedLevel = calculateLevelFromRounds(casinoRoundsPlayed);
+            
+            if (calculatedLevel > casinoRankLevel) {
+                casinoRankLevel = calculatedLevel;
+                playCasinoSound('win');
+                showLevelUpModal(casinoRankLevel);
+            }
+
+            casinoBetLimit = rankLimits[casinoRankLevel];
+            updateLimitInputs();
+            updateRankUI();
+            saveCasinoData();
+        }
+
+        function showLevelUpModal(level) {
+            const modal = document.getElementById("casino-levelup-modal");
+            const title = document.getElementById("levelup-modal-title");
+            const desc = document.getElementById("levelup-modal-desc");
+            if (!modal || !title || !desc) return;
+
+            title.textContent = `STUFE ${level} FREIGESCHALTET!`;
+            if (level === 10) {
+                desc.innerHTML = `Wahnsinn, Operator! Du hast die maximale Stufe 10 erreicht.<br>Neues Einsatzlimit: <b>${rankLimits[level].toLocaleString()} Chips</b><br><span style="color:#ffd700;">🏆 Exklusives Cyber-Perk 'ROOT-Matrix-Overclock' im Profil verfügbar!</span>`;
+            } else {
+                desc.innerHTML = `Dein Account wurde in der Matrix hochgestuft.<br>Neues maximales Einsatzlimit: <b>${rankLimits[level].toLocaleString()} Chips</b>`;
+            }
+
+            modal.classList.remove("hidden");
+        }
+
+        function closeLevelUpModal() {
+            playCasinoSound('close');
+            document.getElementById("casino-levelup-modal").classList.add("hidden");
+        }
+
+        function updateLimitInputs() {
+            ["slots", "bj", "roulette", "crash", "dice", "mine"].forEach(game => {
+                const el = document.getElementById(`limit-label-${game}`);
+                if (el) el.textContent = casinoBetLimit.toLocaleString();
+            });
+            document.querySelectorAll("input[type='number'][id$='-bet']").forEach(input => {
+                input.max = casinoBetLimit;
+            });
+            updatePaytableDisplay();
+        }
+
+        function getRankBonusMultiplier() {
+            if (casinoRankLevel >= 10) return 1.15;
+            if (casinoRankLevel >= 7) return 1.08;
+            if (casinoRankLevel >= 4) return 1.03;
+            return 1.00;
+        }
+
+        function updateRankUI() {
+            const badge = document.getElementById("casino-rank-badge");
+            const progress = document.getElementById("casino-rank-progress");
+            if (!badge || !progress) return;
+
+            badge.textContent = `STUFE ${casinoRankLevel} (Limit: ${casinoBetLimit.toLocaleString()})`;
+            
+            if (casinoRankLevel >= 10) {
+                progress.textContent = `(${casinoRoundsPlayed} Runden gespielt – MAX STUFE)`;
+            } else {
+                let remainingRounds = getRoundsNeededForNextLevel(casinoRankLevel, casinoRoundsPlayed);
+                progress.textContent = `(${remainingRounds} Runden bis Stufe ${casinoRankLevel + 1})`;
+            }
+        }
+
+        function checkHighrollerAchievements(chipCount) {
+            if (chipCount >= 10000000) {
+                unlockAchievement("casino_imperator");
+                unlockAchievement("cyber_tycoon");
+                unlockAchievement("highroller_bronze");
+            } else if (chipCount >= 1000000) {
+                unlockAchievement("cyber_tycoon");
+                unlockAchievement("highroller_bronze");
+            } else if (chipCount >= 500000) {
+                unlockAchievement("highroller_bronze");
+            }
+        }
+
+        function checkAmnesiaManagerStatus() {
+            let claimed = localStorage.getItem("437_amnesia_manager_claimed");
+            const triggerBtn = document.getElementById("manager-trigger-btn");
+            if (!triggerBtn) return;
+
+            if (claimed === "true") {
+                triggerBtn.classList.add("hidden");
+            } else {
+                triggerBtn.classList.remove("hidden");
+            }
+        }
+
+        function openAmnesiaManagerModal() {
+            playCasinoSound('open');
+            document.getElementById("amnesia-manager-modal").classList.remove("hidden");
+        }
+
+        function closeAmnesiaManagerModal() {
+            playCasinoSound('close');
+            document.getElementById("amnesia-manager-modal").classList.add("hidden");
+        }
+
+        function claimAmnesiaManagerReward() {
+            if (!checkSpamCooldown()) return;
+            let claimed = localStorage.getItem("437_amnesia_manager_claimed");
+            if (claimed === "true") return;
+
+            localStorage.setItem("437_amnesia_manager_claimed", "true");
+            casinoChips += 5000;
+            updateCasinoUI();
+            playCasinoSound('claim');
+
+            alert("Amnesia437 Manager: 5.000 Start-Chips erfolgreich gutgeschrieben!");
+            closeAmnesiaManagerModal();
+            checkAmnesiaManagerStatus();
+            saveCasinoData();
+        }
+
+        function checkAdminAccessUI() {
+            if (typeof currentUser !== "undefined" && currentUser) {
+                if (currentUser.casino_banned === true) {
+                    document.getElementById("casino-ban-screen").classList.remove("hidden");
+                    return;
+                }
+
+                const isUserAdmin = (typeof isAdmin === "function" && isAdmin()) || 
+                                    ["nalix437", "amnesia437"].includes((currentUser.username || "").toLowerCase()) || 
+                                    currentUser.is_admin === true;
+                if (isUserAdmin) {
+                    const adminTabBtn = document.getElementById("admin-tab-btn");
+                    if (adminTabBtn) adminTabBtn.classList.remove("hidden");
+                    renderAdminOperatorList();
+                }
+            }
+        }
+
+        async function renderAdminOperatorList() {
+            const container = document.getElementById("admin-operator-list");
+            if (!container) return;
+
+            if (typeof supabaseClient !== "undefined" && supabaseClient) {
+                const { data, error } = await supabaseClient
+                    .from("users")
+                    .select("username, casino_chips, casino_rounds, casino_banned")
+                    .order("username", { ascending: true });
+
+                if (error || !data) {
+                    container.innerHTML = `<div style="color: #ff0055; text-align: center; padding: 10px;">Fehler beim Laden</div>`;
+                    return;
+                }
+
+                container.innerHTML = data.map(user => {
+                    const userKey = escapeHTML(user.username);
+                    const userRounds = user.casino_rounds !== undefined && user.casino_rounds !== null ? parseInt(user.casino_rounds) : 0;
+                    const userLevel = calculateLevelFromRounds(userRounds);
+
+                    return `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #1a1a3a; gap: 10px; flex-wrap: wrap;">
+                            <div>
+                                <span style="color: #00f0ff; font-weight: bold; display: block;">${userKey}</span>
+                                <span style="color: #ffd700; font-size: 11px;">🪙 ${(user.casino_chips || 0).toLocaleString()} Chips | ⚡ Stufe ${userLevel} (${userRounds} Runden)</span>
+                                ${user.casino_banned ? '<span style="color: #ff0055; font-size: 10px; margin-left: 8px; border: 1px solid #ff0055; padding: 1px 4px; border-radius: 3px;">GESPERRT</span>' : ''}
+                            </div>
+                            <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                                <input type="number" id="admin-modify-amount-${userKey}" value="100" style="background: #0c0c18; border: 1px solid #333; color: #fff; padding: 4px; width: 60px; border-radius: 4px; font-family: monospace; font-size: 11px;" title="Chips Betrag">
+                                <button onclick="adminModifyUserChips('${userKey}', 'add')" class="btn" style="background: rgba(0,255,102,0.15); border: 1px solid #00ff66; color: #00ff66; padding: 4px 6px; font-size: 10px; cursor: pointer;">+ Chips</button>
+                                <button onclick="adminModifyUserChips('${userKey}', 'sub')" class="btn" style="background: rgba(255,0,85,0.15); border: 1px solid #ff0055; color: #ff0055; padding: 4px 6px; font-size: 10px; cursor: pointer;">- Chips</button>
+                                
+                                <select id="admin-set-level-${userKey}" style="background: #0c0c18; border: 1px solid #00f0ff; color: #00f0ff; padding: 4px; border-radius: 4px; font-family: monospace; font-size: 11px;">
+                                    ${[1,2,3,4,5,6,7,8,9,10].map(lvl => `<option value="${lvl}" ${lvl === userLevel ? 'selected' : ''}>Stufe ${lvl}</option>`).join('')}
+                                </select>
+                                <button onclick="adminSetUserLevel('${userKey}')" class="btn" style="background: rgba(0,240,255,0.15); border: 1px solid #00f0ff; color: #00f0ff; padding: 4px 8px; font-size: 10px; cursor: pointer;">Level setzen</button>
+
+                                <button onclick="adminToggleCasinoBan('${userKey}', ${user.casino_banned ? 'true' : 'false'})" class="btn" style="background: ${user.casino_banned ? 'rgba(0,255,102,0.15)' : 'rgba(255,0,85,0.15)'}; border: 1px solid ${user.casino_banned ? '#00ff66' : '#ff0055'}; color: ${user.casino_banned ? '#00ff66' : '#ff0055'}; padding: 4px 8px; font-size: 10px; cursor: pointer;">
+                                    ${user.casino_banned ? 'Entsperren' : 'Sperren'}
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join("");
+            } else {
+                container.innerHTML = `<div style="color: #666; text-align: center;">Offline-Modus</div>`;
+            }
+        }
+
+        async function adminSetUserLevel(username) {
+            const selectEl = document.getElementById(`admin-set-level-${username}`);
+            if (!selectEl) return;
+            const targetLevel = parseInt(selectEl.value);
+            let targetRounds = getRequiredRoundsForLevel(targetLevel);
+
+            if (typeof supabaseClient !== "undefined" && supabaseClient) {
+                const { error } = await supabaseClient
+                    .from("users")
+                    .update({ casino_rounds: targetRounds })
+                    .ilike("username", username);
+
+                if (!error) {
+                    playCasinoSound('win');
+                    alert(`Stufe für ${username} erfolgreich auf Stufe ${targetLevel} (${targetRounds} Runden) gesetzt!`);
+                    renderAdminOperatorList();
+
+                    if (currentUser && currentUser.username.toLowerCase() === username.toLowerCase()) {
+                        let oldLevel = casinoRankLevel;
+                        casinoRoundsPlayed = targetRounds;
+                        casinoRankLevel = targetLevel;
+                        casinoBetLimit = rankLimits[casinoRankLevel];
+                        updateLimitInputs();
+                        updateRankUI();
+                        await saveCasinoData();
+
+                        if (casinoRankLevel > oldLevel) {
+                            showLevelUpModal(casinoRankLevel);
+                        }
+                    }
+                } else {
+                    alert("Fehler beim Aktualisieren der Stufe.");
+                }
+            }
+        }
+
+        async function adminModifyUserChips(username, action) {
+            const input = document.getElementById(`admin-modify-amount-${username}`);
+            if (!input) return;
+            const amount = parseInt(input.value);
+            if (isNaN(amount) || amount <= 0) { alert("Ungültiger Betrag."); return; }
+
+            if (typeof supabaseClient !== "undefined" && supabaseClient) {
+                const { data: userData } = await supabaseClient.from("users").select("casino_chips").ilike("username", username).single();
+                if (!userData) return;
+
+                let currentChips = userData.casino_chips || 0;
+                let newChips = action === 'add' ? currentChips + amount : Math.max(0, currentChips - amount);
+
+                const { error } = await supabaseClient
+                    .from("users")
+                    .update({ casino_chips: newChips })
+                    .ilike("username", username);
+
+                if (!error) {
+                    playCasinoSound('win');
+                    renderAdminOperatorList();
+                    loadCasinoLeaderboard();
+
+                    if (currentUser && currentUser.username.toLowerCase() === username.toLowerCase()) {
+                        casinoChips = newChips;
+                        await saveCasinoData();
+                        updateCasinoUI();
+                        checkHighrollerAchievements(casinoChips);
+                    }
+                }
+            }
+        }
+
+        async function adminToggleCasinoBan(username, currentStatus) {
+            const newBanState = !currentStatus;
+            if (typeof supabaseClient !== "undefined" && supabaseClient) {
+                const { error } = await supabaseClient
+                    .from("users")
+                    .update({ casino_banned: newBanState })
+                    .ilike("username", username);
+
+                if (!error) {
+                    playCasinoSound('click');
+                    renderAdminOperatorList();
+                }
+            }
+        }
+
+        function checkChipsOrWarn(requiredAmount) {
+            if (casinoChips < requiredAmount) {
+                const modalText = document.getElementById("modal-warning-text");
+                if (modalText) modalText.textContent = "Operator, dein Guthaben reicht nicht aus! Warte auf die automatische Fütterung (alle 15 Min. 25 Chips).";
+                document.getElementById("low-chips-modal").classList.remove("hidden");
+                playCasinoSound('lose');
+                return false;
+            }
+            return true;
+        }
+
+        function closeLowChipsModal() {
+            document.getElementById("low-chips-modal").classList.add("hidden");
+        }
+
+        async function loadCasinoData() {
+            let savedChips = localStorage.getItem("437_casino_chips");
+            let savedTime = localStorage.getItem("437_casino_last_time");
+            let savedRounds = localStorage.getItem("437_casino_rounds");
+            let savedHash = localStorage.getItem("437_casino_hash");
+
+            if (savedChips !== null && savedRounds !== null && savedHash !== null) {
+                let parsedChips = parseInt(savedChips);
+                let parsedRounds = parseInt(savedRounds);
+                let expectedHash = await generateChecksum(parsedChips, parsedRounds);
+
+                if (expectedHash !== savedHash) {
+                    console.warn("Anti-Cheat: Manipulierter Speicherstand erkannt! Guthaben wird zurückgesetzt.");
+                    localStorage.clear();
+                    casinoChips = 1000;
+                    casinoRoundsPlayed = 0;
+                } else {
+                    casinoChips = parsedChips;
+                    casinoRoundsPlayed = parsedRounds;
+                }
+            }
+
+            if (savedTime !== null) lastTimestamp = parseInt(savedTime);
+            else lastTimestamp = Date.now();
+
+            let previousLevel = casinoRankLevel;
+            casinoRankLevel = calculateLevelFromRounds(casinoRoundsPlayed);
+            casinoBetLimit = rankLimits[casinoRankLevel];
+            updateLimitInputs();
+
+            let now = Date.now();
+            let elapsed = now - lastTimestamp;
+            if (elapsed > 0) {
+                let intervalsPassed = Math.floor(elapsed / INTERVAL_TIME);
+                if (intervalsPassed > 0) {
+                    let earned = intervalsPassed * CHIPS_REWARD;
+                    casinoChips += earned;
+                    lastTimestamp += intervalsPassed * INTERVAL_TIME;
+                }
+            }
+
+            if (typeof currentUser !== "undefined" && currentUser && typeof supabaseClient !== "undefined" && supabaseClient) {
+                supabaseClient.from("users").select("casino_chips, casino_rounds, casino_banned").ilike("username", currentUser.username).maybeSingle().then(({ data }) => {
+                    if (data) {
+                        if (data.casino_banned === true) {
+                            document.getElementById("casino-ban-screen").classList.remove("hidden");
+                            return;
+                        }
+                        if (data.casino_rounds !== undefined && data.casino_rounds !== null) {
+                            let serverRounds = parseInt(data.casino_rounds);
+                            let serverLevel = calculateLevelFromRounds(serverRounds);
+                            if (serverRounds > casinoRoundsPlayed) {
+                                casinoRoundsPlayed = serverRounds;
+                                casinoRankLevel = serverLevel;
+                                casinoBetLimit = rankLimits[casinoRankLevel];
+                                updateLimitInputs();
+                                updateRankUI();
+                                if (casinoRankLevel > previousLevel) {
+                                    showLevelUpModal(casinoRankLevel);
+                                }
+                            }
+                        }
+                        if (data.casino_chips !== undefined) {
+                            casinoChips = Math.max(casinoChips, data.casino_chips);
+                            updateCasinoUI();
+                            checkHighrollerAchievements(casinoChips);
+                        }
+                    }
+                });
+            }
+
+            updateCasinoUI();
+            updateRankUI();
+            loadCasinoLeaderboard();
+            checkHighrollerAchievements(casinoChips);
+            await saveCasinoData();
+        }
+
+        async function saveCasinoData() {
+            let hash = await generateChecksum(casinoChips, casinoRoundsPlayed);
+            localStorage.setItem("437_casino_chips", casinoChips.toString());
+            localStorage.setItem("437_casino_last_time", lastTimestamp.toString());
+            localStorage.setItem("437_casino_rounds", casinoRoundsPlayed.toString());
+            localStorage.setItem("437_casino_hash", hash);
+            checkHighrollerAchievements(casinoChips);
+
+            if (typeof currentUser !== "undefined" && currentUser && typeof supabaseClient !== "undefined" && supabaseClient) {
+                supabaseClient.from("users").update({ 
+                    casino_chips: casinoChips,
+                    casino_rounds: casinoRoundsPlayed 
+                }).eq("username", currentUser.username).then(() => {
+                    loadCasinoLeaderboard();
+                });
+            }
+        }
+
+        async function manualSaveCasinoData() {
+            await saveCasinoData();
+            playCasinoSound('win');
+            alert("💾 Spielstand erfolgreich synchronisiert & Anticheat-Prüfsumme aktualisiert!");
+        }
+
+        function casinoTicker() {
+            let now = Date.now();
+            let elapsed = now - lastTimestamp;
+            let remaining = INTERVAL_TIME - elapsed;
+
+            if (remaining <= 0) {
+                casinoChips += CHIPS_REWARD;
+                lastTimestamp += INTERVAL_TIME;
+                saveCasinoData();
+                updateCasinoUI();
+                playCasinoSound('win');
+                remaining = INTERVAL_TIME;
+            }
+
+            let totalSecs = Math.floor(remaining / 1000);
+            let mins = Math.floor(totalSecs / 60);
+            let secs = totalSecs % 60;
+            const timerDisplay = document.getElementById("faucet-timer-display");
+            if (timerDisplay) {
+                timerDisplay.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+            }
+
+            updateCasinoUI();
+        }
+
+        function updateCasinoUI() {
+            const display = document.getElementById("casino-chips-display");
+            if (display) display.textContent = `🪙 ${casinoChips.toLocaleString()} Chips`;
+        }
+
+        function switchCasinoTab(tabName, event) {
+            playCasinoSound('click');
+            document.querySelectorAll(".casino-game-panel").forEach(p => p.classList.remove("active"));
+            document.querySelectorAll(".casino-tab-btn").forEach(b => b.classList.remove("active"));
+
+            document.getElementById(`panel-${tabName}`).classList.add("active");
+            if (event && event.currentTarget) event.currentTarget.classList.add("active");
+            if (tabName === 'admin') renderAdminOperatorList();
+        }
+
+        // ==========================================
+        // REAL 5x5 AUTOMATEN SLOTS ENGINE (EXAKTE LINIEN)
+        // ==========================================
+        const slotSymbols = [
+            { icon: "🌿", name: "Bud", mult: { 3: 0.5, 4: 1.5, 5: 3.0 } },
+            { icon: "💨", name: "Smoke", mult: { 3: 1.0, 4: 2.5, 5: 5.0 } },
+            { icon: "🍯", name: "Dab", mult: { 3: 1.5, 4: 4.0, 5: 8.0 } },
+            { icon: "🔥", name: "Lighter", mult: { 3: 2.0, 4: 6.0, 5: 12.0 } },
+            { icon: "🚀", name: "Space", mult: { 3: 4.0, 4: 10.0, 5: 25.0 } },
+            { icon: "💎", name: "Crystal (Scatter)", mult: { 3: 0, 4: 0, 5: "10 Freispiele" } }
+        ];
+
+        function updatePaytableDisplay() {
+            const container = document.getElementById("paytable-list");
+            if (!container) return;
+            const betInput = document.getElementById("slot-bet");
+            const currentBet = betInput ? (parseInt(betInput.value) || 50) : 50;
+
+            container.innerHTML = slotSymbols.map(sym => {
+                if (sym.icon === "💎") {
+                    return `
+                        <div class="paytable-sidebar-item">
+                            <span class="sym">${sym.icon}</span>
+                            <div class="values">
+                                <span style="color:#00f0ff;">5x in Linie = 🎁 10 Freispiele</span>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                let v3 = Math.floor(currentBet * sym.mult[3]).toLocaleString();
+                let v4 = Math.floor(currentBet * sym.mult[4]).toLocaleString();
+                let v5 = Math.floor(currentBet * sym.mult[5]).toLocaleString();
+
+                return `
+                    <div class="paytable-sidebar-item">
+                        <span class="sym">${sym.icon}</span>
+                        <div class="values">
+                            3x: 🪙 ${v3}<br>
+                            4x: 🪙 ${v4}<br>
+                            5x: 🪙 ${v5}
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        function renderSlotGrid5x5Initial() {
+            const grid = document.getElementById("slot-grid-5x5");
+            if (!grid) return;
+            grid.innerHTML = "";
+            for (let i = 0; i < 25; i++) {
+                const cell = document.createElement("div");
+                cell.className = "slot-cell-5x5";
+                cell.textContent = slotSymbols[i % (slotSymbols.length - 1)].icon;
+                grid.appendChild(cell);
+            }
+        }
+
+        function getRandomSymbolWeighted() {
+            let rand = Math.random();
+            if (rand < 0.025) return slotSymbols[5];
+            let normalIdx = Math.floor(Math.random() * 5);
+            return slotSymbols[normalIdx];
+        }
+
+        function spinSlotsRealEngine() {
+            if (!checkSpamCooldown()) return;
+
+            const bet = parseInt(document.getElementById("slot-bet").value);
+            if (!validateBetAmount(bet)) return;
+
+            const msg = document.getElementById("slot-message");
+            const gambleBtn = document.getElementById("slot-gamble-btn");
+            const spinBtn = document.getElementById("slot-spin-btn");
+            if (gambleBtn) gambleBtn.classList.add("hidden");
+
+            if (freeSpinsRemaining <= 0) {
+                if (!checkChipsOrWarn(bet)) return;
+                casinoChips -= bet;
+                updateCasinoUI();
+                recordRoundPlayed();
+            } else {
+                freeSpinsRemaining--;
+                updateFreeSpinsUI();
+            }
+
+            playCasinoSound('click');
+            spinBtn.disabled = true;
+
+            const grid = document.getElementById("slot-grid-5x5");
+            const cells = grid.querySelectorAll(".slot-cell-5x5");
+
+            let betRatio = bet / casinoBetLimit;
+            let baseWinChance = 0.30 - (betRatio * 0.12);
+            if (freeSpinsRemaining > 0) baseWinChance = 0.48;
+            let isWin = Math.random() < baseWinChance;
+
+            let board = [];
+            for (let r = 0; r < 5; r++) {
+                let row = [];
+                for (let col = 0; col < 5; col++) {
+                    row.push(getRandomSymbolWeighted());
+                }
+                board.push(row);
+            }
+
+            if (isWin) {
+                let winSym = slotSymbols[Math.floor(Math.random() * (slotSymbols.length - 1))];
+                let lineRow = Math.floor(Math.random() * 5);
+                let matchCount = Math.random() > 0.4 ? 3 : (Math.random() > 0.5 ? 4 : 5);
+                for (let c = 0; c < matchCount; c++) {
+                    board[lineRow][c] = winSym;
+                }
+            }
+
+            let triggerFreeSpins = Math.random() < 0.02;
+            if (triggerFreeSpins) {
+                let freeSpinRow = Math.floor(Math.random() * 5);
+                for (let c = 0; c < 5; c++) {
+                    board[freeSpinRow][c] = slotSymbols[5];
+                }
+            }
+
+            msg.textContent = "Walzen drehen sich...";
+
+            cells.forEach((cell, idx) => {
+                cell.classList.remove("winning-glow", "drop-anim");
+                let col = idx % 5;
+                
+                let stripHTML = `<div class="slot-reel-strip spinning-anim">`;
+                for(let k = 0; k < 6; k++) {
+                    let randSym = getRandomSymbolWeighted().icon;
+                    stripHTML += `<div class="slot-reel-item">${randSym}</div>`;
+                }
+                stripHTML += `<div class="slot-reel-item">${board[Math.floor(idx/5)][col].icon}</div></div>`;
+                cell.innerHTML = stripHTML;
+            });
+
+            for (let col = 0; col < 5; col++) {
+                setTimeout(() => {
+                    playCasinoSound('click');
+                    for (let r = 0; r < 5; r++) {
+                        let cellIdx = r * 5 + col;
+                        let cell = cells[cellIdx];
+                        cell.innerHTML = board[r][col].icon;
+                        cell.classList.add("drop-anim");
+                    }
+                }, 350 + (col * 200));
+            }
+
+            setTimeout(() => {
+                spinBtn.disabled = false;
+                evaluateRealAutomatenSlots(bet, board, cells);
+            }, 1500);
+        }
+
+        function updateFreeSpinsUI() {
+            const badge = document.getElementById("freespins-status-badge");
+            const countEl = document.getElementById("freespins-left");
+            if (!badge || !countEl) return;
+
+            if (freeSpinsRemaining > 0) {
+                badge.style.display = "inline-block";
+                countEl.textContent = freeSpinsRemaining;
+            } else {
+                badge.style.display = "none";
+            }
+        }
+
+        function evaluateRealAutomatenSlots(bet, board, cells) {
+            const msg = document.getElementById("slot-message");
+            const gambleBtn = document.getElementById("slot-gamble-btn");
+
+            let totalWin = 0;
+            let winningCoords = new Set();
+            let gotFreeSpinsThisRound = false;
+
+            let paylines = [
+                [[0,0],[0,1],[0,2],[0,3],[0,4]],
+                [[1,0],[1,1],[1,2],[1,3],[1,4]],
+                [[2,0],[2,1],[2,2],[2,3],[2,4]],
+                [[3,0],[3,1],[3,2],[3,3],[3,4]],
+                [[4,0],[4,1],[4,2],[4,3],[4,4]],
+                [[0,0],[1,1],[2,2],[3,3],[4,4]],
+                [[4,0],[3,1],[2,2],[1,3],[0,4]]
+            ];
+
+            paylines.forEach(line => {
+                let firstSym = board[line[0][0]][line[0][1]];
+
+                let matchLen = 1;
+                let matchedLineCells = [line[0]];
+
+                for (let i = 1; i < line.length; i++) {
+                    let currentSym = board[line[i][0]][line[i][1]];
+                    if (currentSym.icon === firstSym.icon) {
+                        matchLen++;
+                        matchedLineCells.push(line[i]);
+                    } else {
+                        break;
+                    }
+                }
+
+                if (firstSym.icon === "💎" && matchLen === 5) {
+                    gotFreeSpinsThisRound = true;
+                    matchedLineCells.forEach(c => winningCoords.add(`${c[0]},${c[1]}`));
+                } else if (firstSym.icon !== "💎" && matchLen >= 3 && matchLen <= 5) {
+                    let mult = firstSym.mult[matchLen];
+                    if (mult > 0) {
+                        let lineWin = Math.floor(bet * mult);
+                        totalWin += lineWin;
+                        matchedLineCells.forEach(c => winningCoords.add(`${c[0]},${c[1]}`));
+                    }
+                }
+            });
+
+            if (gotFreeSpinsThisRound) {
+                freeSpinsRemaining += 10;
+                playCasinoSound('win');
+                msg.innerHTML = `<span style="color: #ffd700; font-size: 16px;">🎁 5 DIAMANTEN IN LINIE! +10 FREISPIELE FREIGESCHALTET!</span>`;
+            }
+
+            winningCoords.forEach(coordStr => {
+                let [r, c] = coordStr.split(',').map(Number);
+                let cellIdx = r * 5 + c;
+                cells[cellIdx].classList.add("winning-glow");
+            });
+
+            if (totalWin > 0) {
+                totalWin = Math.floor(totalWin * getRankBonusMultiplier());
+                if (freeSpinsRemaining > 0) totalWin *= 2;
+                lastSlotWinAmount = totalWin;
+                playCasinoSound('win');
+                document.getElementById("main-casino-box").classList.add("shake-effect");
+                setTimeout(() => document.getElementById("main-casino-box").classList.remove("shake-effect"), 500);
+
+                animateScoreCount(0, totalWin, (currentVal) => {
+                    if (!gotFreeSpinsThisRound) {
+                        msg.innerHTML = `<span style="color: #00ff66; font-size: 16px; text-shadow: 0 0 10px #00ff66;">🌿 LINIEN-GEWINN: +${currentVal.toLocaleString()} Chips</span>`;
+                    }
+                }, () => {
+                    casinoChips += totalWin;
+                    updateCasinoUI();
+                    saveCasinoData();
+                    updateFreeSpinsUI();
+                });
+
+                if (gambleBtn && !gotFreeSpinsThisRound) gambleBtn.classList.remove("hidden");
+            } else {
+                lastSlotWinAmount = 0;
+                if (!gotFreeSpinsThisRound) {
+                    playCasinoSound('lose');
+                    msg.innerHTML = `<span style="color: #ff0055;">Keine zusammenhängende Gewinnlinie.</span>`;
+                }
+                saveCasinoData();
+                updateFreeSpinsUI();
+            }
+        }
+
+        // ==========================================
+        // BOOK OF RA KARTEN-RISIKO (VOLLSTÄNDIG MIT HISTORIE)
+        // ==========================================
+        const gambleCardsPool = [
+            { text: "7♥", color: "red" }, { text: "8♥", color: "red" }, { text: "9♥", color: "red" }, { text: "10♥", color: "red" }, { text: "J♥", color: "red" }, { text: "Q♥", color: "red" }, { text: "K♥", color: "red" }, { text: "A♥", color: "red" },
+            { text: "7♦", color: "red" }, { text: "8♦", color: "red" }, { text: "9♦", color: "red" }, { text: "10♦", color: "red" }, { text: "J♦", color: "red" }, { text: "Q♦", color: "red" }, { text: "K♦", color: "red" }, { text: "A♦", color: "red" },
+            { text: "7♠", color: "black" }, { text: "8♠", color: "black" }, { text: "9♠", color: "black" }, { text: "10♠", color: "black" }, { text: "J♠", color: "black" }, { text: "Q♠", color: "black" }, { text: "K♠", color: "black" }, { text: "A♠", color: "black" },
+            { text: "7♣", color: "black" }, { text: "8♣", color: "black" }, { text: "9♣", color: "black" }, { text: "10♣", color: "black" }, { text: "J♣", color: "black" }, { text: "Q♣", color: "black" }, { text: "K♣", color: "black" }, { text: "A♣", color: "black" }
+        ];
+
+        function openGambleModal() {
+            if (lastSlotWinAmount <= 0) return;
+            playCasinoSound('open');
+            document.getElementById("gamble-win-amount").textContent = lastSlotWinAmount.toLocaleString();
+            document.getElementById("gamble-result-display").textContent = "Wähle Rot oder Schwarz";
+            
+            gambleHistoryCards = [];
+            renderGambleHistoryStrip();
+
+            const cardEl = document.getElementById("gamble-card-container");
+            cardEl.className = "gamble-card-display card-back";
+            cardEl.innerHTML = '<i class="fas fa-question"></i>';
+
+            document.getElementById("gamble-modal").classList.remove("hidden");
+        }
+
+        function closeGambleModal() {
+            playCasinoSound('close');
+            document.getElementById("gamble-modal").classList.add("hidden");
+        }
+
+        function renderGambleHistoryStrip() {
+            const strip = document.getElementById("gamble-history-strip");
+            if (!strip) return;
+            let html = "";
+            for (let i = 0; i < 5; i++) {
+                if (gambleHistoryCards[i]) {
+                    let card = gambleHistoryCards[i];
+                    let col = card.color === 'red' ? '#ff0055' : '#000';
+                    html += `<div class="history-mini-card" style="color: ${col};">${card.text}</div>`;
+                } else {
+                    html += `<div class="history-mini-card" style="background:#222; color:#555;">-</div>`;
+                }
+            }
+            strip.innerHTML = html;
+        }
+
+        function chooseGambleCard(choice) {
+            if (!checkSpamCooldown() || lastSlotWinAmount <= 0) return;
+            const resDisplay = document.getElementById("gamble-result-display");
+            const cardEl = document.getElementById("gamble-card-container");
+
+            let drawnCard = gambleCardsPool[Math.floor(Math.random() * gambleCardsPool.length)];
+            let won = (drawnCard.color === choice);
+
+            gambleHistoryCards.unshift(drawnCard);
+            if (gambleHistoryCards.length > 5) gambleHistoryCards.pop();
+            renderGambleHistoryStrip();
+
+            cardEl.className = "gamble-card-display";
+            cardEl.style.color = drawnCard.color === 'red' ? '#ff0055' : '#000';
+            cardEl.textContent = drawnCard.text;
+
+            if (won) {
+                lastSlotWinAmount *= 2;
+                playCasinoSound('win');
+                document.getElementById("gamble-win-amount").textContent = lastSlotWinAmount.toLocaleString();
+                resDisplay.innerHTML = `<span style="color: #00ff66;">RICHTIG! Neuer Gewinn: +${lastSlotWinAmount.toLocaleString()} Chips</span>`;
+            } else {
+                playCasinoSound('lose');
+                resDisplay.innerHTML = `<span style="color: #ff0055;">FALSCH! Risiko verloren.</span>`;
+                lastSlotWinAmount = 0;
+                document.getElementById("slot-gamble-btn").classList.add("hidden");
+                setTimeout(() => {
+                    closeGambleModal();
+                    document.getElementById("slot-message").innerHTML = `<span style="color: #ff0055;">Risiko verloren!</span>`;
+                }, 1500);
+            }
+        }
+
+        function collectGambleWin() {
+            if (lastSlotWinAmount > 0) {
+                casinoChips += lastSlotWinAmount;
+                updateCasinoUI();
+                saveCasinoData();
+                playCasinoSound('claim');
+                document.getElementById("slot-message").innerHTML = `<span style="color: #00ff66;">Gewinn gesichert: +${lastSlotWinAmount.toLocaleString()} Chips</span>`;
+                lastSlotWinAmount = 0;
+                document.getElementById("slot-gamble-btn").classList.add("hidden");
+            }
+            closeGambleModal();
+        }
+
+        function animateScoreCount(start, end, onUpdate, onComplete) {
+            let duration = 700;
+            let startTime = null;
+
+            function step(timestamp) {
+                if (!startTime) startTime = timestamp;
+                let progress = Math.min((timestamp - startTime) / duration, 1);
+                let current = Math.floor(start + progress * (end - start));
+                onUpdate(current);
+                if (progress < 1) {
+                    requestAnimationFrame(step);
+                } else {
+                    if (onComplete) onComplete();
+                }
+            }
+            requestAnimationFrame(step);
+        }
+
+        let bjDeck = [];
+        let bjPlayerHand = [];
+        let bjDealerHand = [];
+        let bjActiveBet = 0;
+
+        function startBlackjack() {
+            if (!checkSpamCooldown()) return;
+            const bet = parseInt(document.getElementById("bj-bet").value);
+            if (!validateBetAmount(bet)) return;
+            if (!checkChipsOrWarn(bet)) return;
+
+            playCasinoSound('click');
+            bjActiveBet = bet;
+            casinoChips -= bet;
+            updateCasinoUI();
+            recordRoundPlayed();
+
+            bjDeck = createDeck();
+            if (Math.random() < 0.30) {
+                bjPlayerHand = [{val: '10', suit: '♠'}, {val: 'A', suit: '♥'}];
+                bjDealerHand = [{val: '9', suit: '♦'}, {val: '7', suit: '♣'}];
+            } else {
+                bjPlayerHand = [drawCard(), drawCard()];
+                bjDealerHand = [drawCard(), drawCard()];
+            }
+
+            renderBlackjack(false);
+            document.getElementById("bj-start-btn").style.display = "none";
+            document.getElementById("bj-actions").style.display = "flex";
+            const doubleBtn = document.getElementById("bj-double-btn");
+            if (doubleBtn) doubleBtn.style.display = casinoChips >= bjActiveBet ? "inline-block" : "none";
+            document.getElementById("bj-status-msg").textContent = "Wähle deine Aktion...";
+        }
+
+        function createDeck() {
+            let deck = [];
+            let suits = ["♠", "♥", "♦", "♣"];
+            let values = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"];
+            for (let s of suits) {
+                for (let v of values) { deck.push({ suit: s, val: v }); }
+            }
+            return deck.sort(() => Math.random() - 0.5);
+        }
+
+        function drawCard() {
+            if (bjDeck.length === 0) bjDeck = createDeck();
+            return bjDeck.pop();
+        }
+
+        function calculateScore(hand) {
+            let score = 0;
+            let aces = 0;
+            for (let card of hand) {
+                if (["J", "Q", "K"].includes(card.val)) score += 10;
+                else if (card.val === "A") { score += 11; aces++; }
+                else score += parseInt(card.val);
+            }
+            while (score > 21 && aces > 0) { score -= 10; aces--; }
+            return score;
+        }
+
+        function renderBlackjack(revealDealer) {
+            const pRow = document.getElementById("player-cards");
+            const dRow = document.getElementById("dealer-cards");
+
+            pRow.innerHTML = bjPlayerHand.map(c => `<div class="playing-card"><span>${c.val}</span><span>${c.suit}</span></div>`).join("");
+            
+            if (revealDealer) {
+                dRow.innerHTML = bjDealerHand.map(c => `<div class="playing-card"><span>${c.val}</span><span>${c.suit}</span></div>`).join("");
+                document.getElementById("dealer-score").textContent = calculateScore(bjDealerHand);
+            } else {
+                dRow.innerHTML = `<div class="playing-card"><span>${bjDealerHand[0].val}</span><span>${bjDealerHand[0].suit}</span></div><div class="playing-card" style="background:#222;color:#666;">?</div>`;
+                document.getElementById("dealer-score").textContent = "...";
+            }
+            document.getElementById("player-score").textContent = calculateScore(bjPlayerHand);
+        }
+
+        function bjHit() {
+            if (!checkSpamCooldown()) return;
+            document.getElementById("bj-double-btn").style.display = "none";
+            bjPlayerHand.push(drawCard());
+            renderBlackjack(false);
+            if (calculateScore(bjPlayerHand) > 21) {
+                endBlackjack("Überkauft! Dealer gewinnt.");
+            }
+        }
+
+        function bjDoubleDown() {
+            if (!checkSpamCooldown() || casinoChips < bjActiveBet) return;
+            if (bjActiveBet * 2 > casinoBetLimit) {
+                alert(`Einsatzlimit überschritten! Max erlaubt: ${casinoBetLimit}`);
+                return;
+            }
+            casinoChips -= bjActiveBet;
+            bjActiveBet *= 2;
+            updateCasinoUI();
+            bjPlayerHand.push(drawCard());
+            renderBlackjack(false);
+
+            if (calculateScore(bjPlayerHand) > 21) {
+                endBlackjack("Überkauft nach Verdopplung!");
+            } else {
+                bjStand();
+            }
+        }
+
+        function bjStand() {
+            if (!checkSpamCooldown()) return;
+            let dScore = calculateScore(bjDealerHand);
+            while (dScore < 17) {
+                bjDealerHand.push(drawCard());
+                dScore = calculateScore(bjDealerHand);
+            }
+            renderBlackjack(true);
+
+            let pScore = calculateScore(bjPlayerHand);
+            if (dScore <= 21 && dScore >= pScore) {
+                endBlackjack("Dealer gewinnt bei Gleichstand!");
+            } else if (dScore > 21 || pScore > dScore) {
+                endBlackjack("Glückwunsch! Du hast gewonnen!");
+            } else {
+                endBlackjack("Dealer gewinnt.");
+            }
+        }
+
+        function endBlackjack(msg) {
+            document.getElementById("bj-status-msg").textContent = msg;
+            if (msg.includes("gewonnen") || msg.includes("Blackjack")) {
+                let payout = Math.floor((bjActiveStrPayout(bjActiveBet)) * getRankBonusMultiplier());
+                casinoChips += payout;
+                playCasinoSound('win');
+            } else {
+                playCasinoSound('lose');
+            }
+            saveCasinoData();
+            document.getElementById("bj-start-btn").style.display = "inline-block";
+            document.getElementById("bj-actions").style.display = "none";
+        }
+
+        function bjActiveStrPayout(bet) {
+            return Math.floor(bet * 1.5);
+        }
+
+        const numbersOrder = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
+
+        function drawRouletteWheel(currentAngle) {
+            const canvas = document.getElementById("roulette-canvas");
+            if (!canvas) return;
+            const ctx = canvas.getContext("2d");
+            const center = canvas.width / 2;
+            const radius = center - 10;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(center, center);
+            ctx.rotate(currentAngle);
+
+            const sliceAngle = (2 * Math.PI) / numbersOrder.length;
+
+            numbersOrder.forEach((num, i) => {
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, radius, i * sliceAngle, (i + 1) * sliceAngle);
+                ctx.closePath();
+
+                if (num === 0) ctx.fillStyle = "#00ff66";
+                else if ([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(num)) ctx.fillStyle = "#ff0055";
+                else ctx.fillStyle = "#080814";
+
+                ctx.fill();
+                ctx.strokeStyle = "#00f0ff";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                ctx.save();
+                ctx.rotate(i * sliceAngle + sliceAngle / 2);
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 11px monospace";
+                ctx.fillText(num, radius - 25, 4);
+                ctx.restore();
+            });
+
+            ctx.restore();
+        }
+
+        function spinRouletteWheel() {
+            if (!checkSpamCooldown()) return;
+            const bet = parseInt(document.getElementById("roulette-bet").value);
+            if (!validateBetAmount(bet)) return;
+
+            const choice = document.getElementById("roulette-choice").value;
+            const resBox = document.getElementById("roulette-result-box");
+            const spinBtn = document.getElementById("roulette-spin-btn");
+
+            if (!checkChipsOrWarn(bet)) return;
+
+            casinoChips -= bet;
+            updateCasinoUI();
+            playCasinoSound('click');
+            spinBtn.disabled = true;
+            recordRoundPlayed();
+            resBox.textContent = "Kessel rotiert...";
+
+            let forceWin = Math.random() < 0.30;
+            let winningNum;
+
+            const reds = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
+            const blacks = [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35];
+
+            if (forceWin) {
+                if (choice === "red") winningNum = reds[Math.floor(Math.random() * reds.length)];
+                else if (choice === "black") winningNum = blacks[Math.floor(Math.random() * blacks.length)];
+                else winningNum = 0;
+            } else {
+                if (choice === "red") winningNum = blacks[Math.floor(Math.random() * blacks.length)];
+                else winningNum = reds[Math.floor(Math.random() * reds.length)];
+            }
+
+            let targetIndex = numbersOrder.indexOf(winningNum);
+            let sliceAngle = (2 * Math.PI) / numbersOrder.length;
+            let targetAngle = -targetIndex * sliceAngle - sliceAngle / 2 + Math.PI / 2 + (Math.PI * 2 * 6);
+
+            let currentAngle = 0;
+            let startTime = null;
+            let duration = 3000;
+
+            function animateWheel(timestamp) {
+                if (!startTime) startTime = timestamp;
+                let progress = timestamp - startTime;
+                let t = Math.min(progress / duration, 1);
+                let ease = 1 - Math.pow(1 - t, 3);
+                currentAngle = ease * targetAngle;
+
+                drawRouletteWheel(currentAngle);
+
+                if (t < 1) {
+                    requestAnimationFrame(animateWheel);
+                } else {
+                    spinBtn.disabled = false;
+                    evaluateRoulette(winningNum, bet, choice, resBox);
+                }
+            }
+
+            requestAnimationFrame(animateWheel);
+        }
+
+        function evaluateRoulette(roll, bet, choice, resBox) {
+            let color = "green";
+            if (roll !== 0) {
+                const reds = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
+                color = reds.includes(roll) ? "red" : "black";
+            }
+
+            let won = false;
+            let multiplier = 1.4;
+            if (choice === "green" && roll === 0) { won = true; multiplier = 5.0; }
+            else if (choice === color && roll !== 0) { won = true; multiplier = 1.4; }
+
+            if (won) {
+                let win = Math.floor((bet * multiplier) * getRankBonusMultiplier());
+                casinoChips += win;
+                playCasinoSound('win');
+                resBox.innerHTML = `<span style="color: #00ff66;">Treffer: ${roll} (${color.toUpperCase()}) - GEWONNEN +${win.toLocaleString()}!</span>`;
+            } else {
+                playCasinoSound('lose');
+                resBox.innerHTML = `<span style="color: #ff0055;">Gefallen auf: ${roll} (${color.toUpperCase()}) - Verloren!</span>`;
+            }
+            saveCasinoData();
+        }
+
+        let crashInterval = null;
+        let currentMultiplier = 1.00;
+        let crashPoint = 1.00;
+        let crashActiveBet = 0;
+        let crashRunning = false;
+        let autoCashoutValue = 1.40;
+
+        function startCrash() {
+            if (!checkSpamCooldown()) return;
+            const bet = parseInt(document.getElementById("crash-bet").value);
+            if (!validateBetAmount(bet)) return;
+
+            autoCashoutValue = parseFloat(document.getElementById("crash-autocash").value) || 1.40;
+            if (!checkChipsOrWarn(bet)) return;
+
+            playCasinoSound('click');
+            crashActiveBet = bet;
+            casinoChips -= bet;
+            updateCasinoUI();
+            recordRoundPlayed();
+
+            crashRunning = true;
+            currentMultiplier = 1.00;
+
+            let willWin = Math.random() < 0.30;
+            if (willWin) {
+                crashPoint = parseFloat((autoCashoutValue + (Math.random() * 0.8)).toFixed(2));
+            } else {
+                crashPoint = parseFloat((1.01 + (Math.random() * (autoCashoutValue - 1.01))).toFixed(2));
+                if (crashPoint < 1.01) crashPoint = 1.01;
+            }
+
+            document.getElementById("crash-start-btn").classList.add("hidden");
+            document.getElementById("crash-cashout-btn").classList.remove("hidden");
+
+            const arrow = document.getElementById("crash-arrow");
+
+            crashInterval = setInterval(() => {
+                currentMultiplier += 0.03;
+                document.getElementById("crash-multiplier-display").textContent = `${currentMultiplier.toFixed(2)}x`;
+                
+                let scaleVal = 1 + (currentMultiplier - 1) * 0.4;
+                let translateVal = (currentMultiplier - 1) * 25;
+                if (arrow) {
+                    arrow.style.transform = `translate(${translateVal}px, -${translateVal}px) scale(${Math.min(scaleVal, 2.2)})`;
+                }
+
+                if (crashRunning && currentMultiplier >= autoCashoutValue && willWin) {
+                    cashoutCrash();
+                    return;
+                }
+
+                if (currentMultiplier >= crashPoint) {
+                    clearInterval(crashInterval);
+                    crashRunning = false;
+                    playCasinoSound('lose');
+                    document.getElementById("crash-multiplier-display").innerHTML = `<span style="color:#ff0055;">CRASH! (${crashPoint.toFixed(2)}x)</span>`;
+                    if (arrow) arrow.style.transform = "translate(0, 0) scale(1)";
+                    document.getElementById("crash-start-btn").classList.remove("hidden");
+                    document.getElementById("crash-cashout-btn").classList.add("hidden");
+                    saveCasinoData();
+                }
+            }, 65);
+        }
+
+        function cashoutCrash() {
+            if (!crashRunning) return;
+            clearInterval(crashInterval);
+            crashRunning = false;
+
+            let winnings = Math.floor(Math.floor(crashActiveBet * autoCashoutValue) * getRankBonusMultiplier());
+            casinoChips += winnings;
+            saveCasinoData();
+            playCasinoSound('win');
+
+            document.getElementById("crash-multiplier-display").innerHTML = `<span style="color:#00ff66;">CASH OUT! +${winnings.toLocaleString()} (${autoCashoutValue.toFixed(2)}x)</span>`;
+            const arrow = document.getElementById("crash-arrow");
+            if (arrow) arrow.style.transform = "translate(0, 0) scale(1)";
+            document.getElementById("crash-start-btn").classList.remove("hidden");
+            document.getElementById("crash-cashout-btn").classList.add("hidden");
+        }
+
+        function rollCyberDice() {
+            if (!checkSpamCooldown()) return;
+            const bet = parseInt(document.getElementById("dice-bet").value);
+            if (!validateBetAmount(bet)) return;
+
+            const condition = document.getElementById("dice-cond").value;
+            const disp = document.getElementById("dice-result-display");
+            const msg = document.getElementById("dice-msg");
+
+            if (!checkChipsOrWarn(bet)) return;
+
+            casinoChips -= bet;
+            updateCasinoUI();
+            playCasinoSound('click');
+            recordRoundPlayed();
+
+            let isWin = Math.random() < 0.30;
+            let roll = 50;
+
+            if (condition === "under") {
+                roll = isWin ? Math.floor(Math.random() * 29) + 1 : Math.floor(Math.random() * 70) + 31;
+            } else {
+                roll = isWin ? Math.floor(Math.random() * 30) + 71 : Math.floor(Math.random() * 70) + 1;
+            }
+
+            disp.textContent = `🎲 ${roll}`;
+
+            if (isWin) {
+                let win = Math.floor((bet * 1.5) * getRankBonusMultiplier());
+                casinoChips += win;
+                playCasinoSound('win');
+                msg.innerHTML = `<span style="color: #00ff66;">GEWONNEN! +${win.toLocaleString()} Chips</span>`;
+            } else {
+                playCasinoSound('lose');
+                msg.innerHTML = `<span style="color: #ff0055;">VERLOREN!</span>`;
+            }
+            saveCasinoData();
+        }
+
+        let mineActive = false;
+        let mineBet = 0;
+        let mineMultiplier = 1.00;
+        let minePositions = [];
+        let revealedCount = 0;
+
+        function renderMinefieldGridInitial() {
+            const container = document.getElementById("minefield-grid-container");
+            if (!container) return;
+            container.innerHTML = "";
+            for (let i = 0; i < 16; i++) {
+                const tile = document.createElement("div");
+                tile.className = "mine-tile";
+                tile.innerHTML = "❓";
+                container.appendChild(tile);
+            }
+        }
+
+        function startMinefield() {
+            if (!checkSpamCooldown()) return;
+            const bet = parseInt(document.getElementById("mine-bet").value);
+            if (!validateBetAmount(bet)) return;
+
+            if (!checkChipsOrWarn(bet)) return;
+
+            casinoChips -= bet;
+            updateCasinoUI();
+            playCasinoSound('click');
+            recordRoundPlayed();
+
+            mineActive = true;
+            mineBet = bet;
+            mineMultiplier = 1.00;
+            revealedCount = 0;
+
+            minePositions = [];
+            while(minePositions.length < 4) {
+                let r = Math.floor(Math.random() * 16);
+                if(!minePositions.includes(r)) minePositions.push(r);
+            }
+
+            document.getElementById("mine-start-btn").classList.add("hidden");
+            document.getElementById("mine-cashout-btn").classList.remove("hidden");
+            document.getElementById("mine-status").textContent = `Multiplikator: 1.00x`;
+
+            const container = document.getElementById("minefield-grid-container");
+            container.innerHTML = "";
+            for (let i = 0; i < 16; i++) {
+                const tile = document.createElement("div");
+                tile.className = "mine-tile";
+                tile.innerHTML = "🌿";
+                tile.onclick = () => clickMineTile(i, tile);
+                container.appendChild(tile);
+            }
+        }
+
+        function clickMineTile(index, tile) {
+            if (!mineActive || tile.classList.contains("revealed")) return;
+            if (!checkSpamCooldown()) return;
+
+            tile.classList.add("revealed");
+
+            if (minePositions.includes(index)) {
+                tile.innerHTML = "💥";
+                tile.style.background = "rgba(255,0,85,0.3)";
+                tile.style.borderColor = "#ff0055";
+                playCasinoSound('lose');
+                mineActive = false;
+                document.getElementById("mine-status").innerHTML = `<span style="color:#ff0055;">MAMMA MIA! MINE GETROFFEN!</span>`;
+                document.getElementById("mine-start-btn").classList.remove("hidden");
+                document.getElementById("mine-cashout-btn").classList.add("hidden");
+                saveCasinoData();
+            } else {
+                tile.innerHTML = "✨";
+                tile.style.borderColor = "#00ff66";
+                playCasinoSound('win');
+                revealedCount++;
+                mineMultiplier = parseFloat((mineMultiplier + 0.20).toFixed(2));
+                document.getElementById("mine-status").textContent = `Multiplikator: ${mineMultiplier}x`;
+            }
+        }
+
+        function cashoutMinefield() {
+            if (!mineActive) return;
+            mineActive = false;
+            let win = Math.floor(Math.floor(mineBet * mineMultiplier) * getRankBonusMultiplier());
+            casinoChips += win;
+            playCasinoSound('win');
+            document.getElementById("mine-status").innerHTML = `<span style="color:#00ff66;">GESICHERT! +${win.toLocaleString()} Chips (${mineMultiplier}x)</span>`;
+            document.getElementById("mine-start-btn").classList.remove("hidden");
+            document.getElementById("mine-cashout-btn").classList.add("hidden");
+            saveCasinoData();
+        }
+
+        async function loadCasinoLeaderboard() {
+            const container = document.getElementById("casino-leaderboard-list");
+            if (!container) return;
+
+            if (typeof supabaseClient !== "undefined" && supabaseClient) {
+                const { data, error } = await supabaseClient
+                    .from("users")
+                    .select("username, casino_chips")
+                    .order("casino_chips", { ascending: false })
+                    .limit(10);
+
+                if (error || !data || data.length === 0) {
+                    container.innerHTML = `<div style="text-align: center; color: #666;">Noch keine Highroller eingetragen.</div>`;
+                    return;
+                }
+
+                container.innerHTML = data.map((entry, index) => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-bottom: 1px solid #1a1a3a;">
+                        <div>
+                            <span style="color: ${index === 0 ? '#ffd700' : '#fff'}; font-weight: bold; margin-right: 10px;">#${index + 1}</span>
+                            <span style="color: #00ff66;">${escapeHTML(entry.username)}</span>
+                        </div>
+                        <div style="color: #ffd700; font-weight: bold;">🪙 ${(entry.casino_chips || 0).toLocaleString()} Chips</div>
+                    </div>
+                `).join("");
+            } else {
+                container.innerHTML = `<div style="text-align: center; color: #666;">Offline-Modus</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

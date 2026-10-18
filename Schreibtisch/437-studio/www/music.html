@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>437 Studio | Audio Forge Real-Visualizer</title>
+    <link rel="icon" type="image/png" href="img/logo.png">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/maintenance.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .music-page-wrapper {
+            max-width: 1100px;
+            margin: 110px auto 40px auto;
+            padding: 0 20px;
+        }
+
+        .audio-player-hub {
+            margin-top: 25px;
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 25px;
+        }
+
+        .visualizer-container {
+            width: 100%;
+            height: 75px;
+            background: #04040c;
+            border: 1px solid #111122;
+            border-radius: 4px;
+            margin-top: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        #visualizer-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .player-upper-box {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .player-controls-flex {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .player-volume-flex {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 15px;
+            color: #555;
+        }
+
+        @media (max-width: 900px) {
+            .music-page-wrapper {
+                margin-top: 90px;
+                padding: 0 10px;
+            }
+
+            .audio-player-hub {
+                grid-template-columns: 1fr !important;
+                gap: 20px;
+            }
+
+            .player-upper-box {
+                flex-direction: column !important;
+                text-align: center;
+            }
+
+            .track-details {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="grid-overlay"></div>
+
+    <!-- Navigation Bar -->
+  <nav class="navbar">
+        <div class="logo">437<span>Studio</span></div>
+        <div class="menu-toggle"><i class="fas fa-bars"></i></div>
+        <ul class="nav-links">
+            <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="forum.html"><i class="fas fa-comments"></i> Forum</a></li>
+            <li><a href="games.html"><i class="fas fa-gamepad"></i> Games</a></li>
+            <li><a href="mitglieder.html"><i class="fas fa-users"></i> Mitglieder</a></li>         
+            <li><a href="music.html"><i class="fas fa-music"></i> Musik</a></li>
+            <li><a href="discord.html"><i class="fab fa-discord"></i> Discord</a></li>
+            <li class="auth-container">
+                <div id="logged-out-zone">
+                    <button class="btn btn-neon-blue" onclick="redirectToLogin()">Login / Register</button>
+                </div>
+                <!-- Das Badge liegt hier direkt im Haupt-Trigger-Button für permanente Sichtbarkeit -->
+                <div id="logged-in-zone" class="hidden user-trigger" onclick="toggleProfileDropdown()">
+                    <img id="nav-avatar" src="" alt="Avatar">
+                    <span id="nav-username">User</span> 
+                    <span id="admin-badge" class="hidden" style="color:#ff007f; font-size:10px; border:1px solid #ff007f; padding:2px 4px; border-radius:4px; margin-left:5px;">ADMIN</span>
+                    <span id="dropdown-msg-badge" class="hidden"></span>
+                    <div id="profile-dropdown" class="dropdown-menu hidden"></div>
+                </div>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Ticker Insertion Point (Wichtig für konsistentes Layout & Wartungsbanner) -->
+    <div id="ticker-insertion-point" style="margin-top: 70px;"></div>
+
+
+    <div class="music-page-wrapper">
+        <!-- Producer Profil -->
+        <div class="artist-profile-card">
+            <div class="artist-banner">
+                <span class="artist-badge">One Person Studio</span>
+            </div>
+            <div class="artist-info-block">
+                <h2 class="neon-text-pink">Amnesia437</h2>
+                <p class="artist-bio">Der Core-Producer von 437 Studio. Zuständig für die düsteren Synthwave-Phonk-Melodien, Cyber-Beats und atmosphärischen Game-Soundtracks.</p>
+                <a href="https://youtube.com/@Amnesia437" target="_blank" class="btn btn-neon-red youtube-btn"><i class="fab fa-youtube"></i> YouTube Kanal</a>
+            </div>
+        </div>
+
+        <!-- Audio Player Core Matrix -->
+        <div class="audio-player-hub">
+            
+            <div class="cyber-player" style="background:#0c0c18; border:2px solid #00ff66; border-radius:8px; padding:25px; box-shadow:0 0 20px rgba(0,255,102,0.15);">
+                <audio id="audio-core" crossorigin="anonymous"></audio>
+                
+                <div class="player-upper-box">
+                    <div id="player-disc" class="disc-animation" style="font-size:50px; color:#00ff66;"><i class="fas fa-compact-disc"></i></div>
+                    <div class="track-details" style="flex-grow:1;">
+                        <p style="color:#555; text-transform:uppercase; font-size:10px; letter-spacing:1px; margin:0;">Frequenz-Analyse aktiv:</p>
+                        <h3 id="current-track-title" style="color:#fff; margin:4px 0 0 0; font-size:20px;">Wähle einen Track...</h3>
+                        
+                        <div class="visualizer-container">
+                            <canvas id="visualizer-canvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="player-progress-area" style="display:flex; align-items:center; gap:15px; margin-top:20px; font-family:monospace; color:#888;">
+                    <span id="time-current">0:00</span>
+                    <input type="range" id="progress-bar" value="0" min="0" max="100" style="flex-grow:1; cursor:pointer;">
+                    <span id="time-duration">0:00</span>
+                </div>
+
+                <div class="player-controls-flex">
+                    <button class="control-btn" onclick="playerPrevTrack()" style="background:none; border:1px solid #333; color:#fff; padding:10px 15px; cursor:pointer; border-radius:4px;"><i class="fas fa-backward"></i></button>
+                    <button class="control-btn play-pause-btn" onclick="playerTogglePlay()" style="background:none; border:1px solid #00ff66; color:#00ff66; padding:10px 25px; cursor:pointer; border-radius:4px; font-weight:bold;"><i id="play-icon" class="fas fa-play"></i></button>
+                    <button class="control-btn" onclick="playerNextTrack()" style="background:none; border:1px solid #333; color:#fff; padding:10px 15px; cursor:pointer; border-radius:4px;"><i class="fas fa-forward"></i></button>
+                </div>
+
+                <div class="player-volume-flex">
+                    <i class="fas fa-volume-down"></i>
+                    <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.5" style="width:120px; cursor:pointer;">
+                    <i class="fas fa-volume-up"></i>
+                </div>
+            </div>
+
+            <div class="tracklist-box" style="background:#0c0c18; border:1px solid #1a1a3a; border-radius:8px; padding:20px;">
+                <h4 class="neon-text-blue" style="margin:0 0 15px 0; text-transform:uppercase;">Verfügbare Tonträger</h4>
+                <div id="player-tracklist"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script src="js/music.js"></script>
+</body>
+</html>

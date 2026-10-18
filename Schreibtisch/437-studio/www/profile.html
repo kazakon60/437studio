@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>437 Studio | Cyber Profil Matrix & Admin-Modus</title>
+    <link rel="icon" type="image/png" href="/img/logo.png">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/maintenance.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --cyber-bg: #03030a;
+            --cyber-card-bg: rgba(12, 12, 24, 0.85);
+            --neon-blue: #00f0ff;
+            --neon-pink: #ff007f;
+            --neon-green: #00ff66;
+            --neon-orange: #ffaa00;
+            --border-glow: 0 0 20px rgba(0, 240, 255, 0.2);
+            --pink-glow: 0 0 20px rgba(255, 0, 127, 0.2);
+        }
+
+        body {
+            background-color: var(--cyber-bg);
+            color: #fff;
+            font-family: monospace;
+            overflow-x: hidden;
+        }
+
+        .profile-container { 
+            max-width: 1200px; 
+            margin: 110px auto 60px auto; 
+            padding: 0 20px; 
+            box-sizing: border-box;
+        }
+
+        .profile-hero-banner {
+            background: linear-gradient(135deg, rgba(8, 8, 20, 0.95) 0%, rgba(20, 10, 40, 0.95) 100%);
+            border: 2px solid var(--neon-blue);
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.25);
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .profile-hero-banner::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 4px; height: 100%;
+            background: linear-gradient(to bottom, var(--neon-blue), var(--neon-pink));
+        }
+
+        .profile-hero-avatar-wrapper {
+            position: relative;
+            flex-shrink: 0;
+            width: 110px;
+            height: 110px;
+        }
+
+        .profile-hero-avatar {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 3px solid var(--neon-blue);
+            object-fit: cover;
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.4);
+            background: #000;
+            display: block;
+        }
+
+        .profile-status-dot {
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 3px solid #03030a;
+            z-index: 5;
+        }
+        .profile-status-dot.online {
+            background: var(--neon-green);
+            box-shadow: 0 0 12px var(--neon-green);
+        }
+        .profile-status-dot.offline {
+            background: #4a4a5e;
+        }
+
+        .profile-hero-info {
+            flex-grow: 1;
+            min-width: 0;
+        }
+
+        .profile-hero-title {
+            font-size: 24px;
+            font-weight: 900;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 5px;
+            flex-wrap: wrap;
+        }
+
+        .role-badge-cyber {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-weight: bold;
+        }
+        .badge-admin-cyber { background: rgba(255, 0, 127, 0.2); color: var(--neon-pink); border: 1px solid var(--neon-pink); box-shadow: 0 0 8px rgba(255,0,127,0.4); }
+        .badge-user-cyber { background: rgba(0, 240, 255, 0.1); color: var(--neon-blue); border: 1px solid var(--neon-blue); }
+
+        .profile-grid-complex { 
+            display: grid; 
+            grid-template-columns: 1.1fr 0.9fr; 
+            gap: 25px; 
+        }
+
+        .cyber-panel-card { 
+            background: var(--cyber-card-bg); 
+            border: 1px solid var(--neon-blue); 
+            border-radius: 10px; 
+            padding: 25px; 
+            box-shadow: var(--border-glow); 
+            box-sizing: border-box;
+            backdrop-filter: blur(10px);
+            position: relative;
+        }
+
+        .cyber-panel-card.pink-accent {
+            border-color: var(--neon-pink);
+            box-shadow: var(--pink-glow);
+        }
+
+        .panel-heading {
+            font-size: 15px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 10px;
+        }
+
+        .cyber-input-group {
+            margin-bottom: 15px;
+        }
+
+        .cyber-input-group label {
+            display: block;
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .cyber-input-group input, 
+        .cyber-input-group select, 
+        .cyber-textarea {
+            width: 100%;
+            background: rgba(4, 4, 12, 0.9);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            color: #fff;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+            outline: none;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+
+        .cyber-input-group input:focus, 
+        .cyber-input-group select:focus, 
+        .cyber-textarea:focus {
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+        }
+
+        .admin-override-box {
+            background: rgba(255, 0, 127, 0.08);
+            border: 1px dashed var(--neon-pink);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .achievement-card-item { 
+            background: rgba(6, 6, 15, 0.8); 
+            border: 1px solid rgba(255, 255, 255, 0.08); 
+            border-radius: 8px; 
+            padding: 12px 15px; 
+            margin-bottom: 10px; 
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            transition: all 0.2s ease;
+        }
+        .achievement-card-item.unlocked { 
+            border-color: var(--neon-green); 
+            box-shadow: 0 0 10px rgba(0,255,102,0.15); 
+            background: rgba(0, 255, 102, 0.02);
+        }
+        .achievement-card-item.locked { 
+            opacity: 0.35; 
+            filter: grayscale(1); 
+        }
+
+        .pinboard-wall-box {
+            max-height: 320px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-right: 5px;
+        }
+
+        .pinboard-msg-bubble {
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 3px solid var(--neon-pink);
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            position: relative;
+        }
+
+        .pinboard-author {
+            color: var(--neon-pink);
+            font-weight: bold;
+            font-size: 11px;
+            margin-bottom: 3px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pinboard-delete-btn {
+            background: transparent;
+            border: none;
+            color: #ff5577;
+            cursor: pointer;
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: 0.2s;
+        }
+        .pinboard-delete-btn:hover {
+            background: rgba(255, 0, 85, 0.15);
+            color: #ff0055;
+        }
+
+        /* CUSTOM CYBER MODAL / DESIGN-FENSTER */
+        .cyber-comms-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(3, 3, 10, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999999;
+            backdrop-filter: blur(8px);
+            animation: fadeInModal 0.25s ease;
+        }
+        .cyber-comms-modal.hidden {
+            display: none !important;
+        }
+        @keyframes fadeInModal {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .cyber-comms-box {
+            background: linear-gradient(135deg, #0c0c18 0%, #160a2a 100%);
+            border: 2px solid var(--neon-blue);
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(0, 240, 255, 0.35), inset 0 0 15px rgba(0, 240, 255, 0.1);
+            font-family: monospace;
+            position: relative;
+        }
+        .cyber-comms-box.danger {
+            border-color: var(--neon-pink);
+            box-shadow: 0 0 40px rgba(255, 0, 127, 0.35), inset 0 0 15px rgba(255, 0, 127, 0.1);
+        }
+        .cyber-comms-box.success {
+            border-color: var(--neon-green);
+            box-shadow: 0 0 40px rgba(0, 255, 102, 0.35), inset 0 0 15px rgba(0, 255, 102, 0.1);
+        }
+
+        @media(max-width: 992px) { 
+            .profile-grid-complex { grid-template-columns: 1fr; } 
+            .profile-hero-banner { flex-direction: column; text-align: center; gap: 18px; }
+            .profile-hero-title { justify-content: center; }
+            .profile-hero-avatar-wrapper { width: 90px; height: 90px; margin: 0 auto; }
+        }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #03030a; }
+        ::-webkit-scrollbar-thumb { background: var(--neon-blue); border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="grid-overlay"></div>
+
+    <!-- UNIVERSAL CYBER MODAL (ERSETZT ALERT & CONFIRM) -->
+    <div id="cyber-custom-modal" class="cyber-comms-modal hidden">
+        <div id="cyber-modal-box-inner" class="cyber-comms-box">
+            <div id="cyber-modal-icon" style="font-size: 42px; color: var(--neon-blue); margin-bottom: 12px; text-shadow: 0 0 15px rgba(0,240,255,0.6);">
+                <i class="fas fa-satellite-dish"></i>
+            </div>
+            <h2 id="cyber-modal-title" style="color: var(--neon-blue); font-size: 16px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">System Meldung</h2>
+            <p id="cyber-modal-text" style="color: #ccc; font-size: 12px; line-height: 1.5; margin-bottom: 20px;">
+                Nachrichtentext...
+            </p>
+            <div id="cyber-modal-actions" style="display: flex; gap: 10px;">
+                <!-- Dynamische Buttons -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="logo">437<span>Studio</span></div>
+        <div class="menu-toggle"><i class="fas fa-bars"></i></div>
+        <ul class="nav-links">
+            <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="forum.html"><i class="fas fa-comments"></i> Forum</a></li>
+            <li><a href="games.html"><i class="fas fa-gamepad"></i> Games</a></li>
+            <li><a href="mitglieder.html"><i class="fas fa-users"></i> Mitglieder</a></li>
+            <li><a href="music.html"><i class="fas fa-music"></i> Musik</a></li>
+            <li><a href="discord.html"><i class="fab fa-discord"></i> Discord</a></li>
+
+            <li class="auth-container">
+                <div id="logged-out-zone">
+                    <button class="btn btn-neon-blue" onclick="redirectToLogin()">Login / Register</button>
+                </div>
+                <div id="logged-in-zone" class="hidden user-trigger" onclick="toggleProfileDropdown()">
+                    <img id="nav-avatar" src="" alt="Avatar">
+                    <span id="nav-username">User</span> 
+                    <span id="admin-badge" class="hidden" style="color:#ff007f; font-size:10px; border:1px solid #ff007f; padding:2px 4px; border-radius:4px; margin-left:5px;">ADMIN</span>
+                    <span id="dropdown-msg-badge" class="hidden"></span>
+                    <div id="profile-dropdown" class="dropdown-menu hidden"></div>
+                </div>
+            </li>
+        </ul>
+    </nav>
+    <div id="ticker-insertion-point"></div>
+
+    <main class="profile-container">
+        <!-- Hero Header Banner -->
+        <div class="profile-hero-banner">
+            <div class="profile-hero-avatar-wrapper">
+                <img id="main-profile-hero-avatar" src="https://api.dicebear.com/7.x/bottts/svg?seed=437Studio" class="profile-hero-avatar" alt="Avatar">
+                <div id="hero-status-dot" class="profile-status-dot offline" title="Status"></div>
+            </div>
+            <div class="profile-hero-info">
+                <div class="profile-hero-title">
+                    <span id="hero-username-display">Lade Operator Matrix...</span>
+                    <span id="hero-role-badge" class="role-badge-cyber badge-user-cyber">USER</span>
+                </div>
+                <div id="hero-subtitle-text" style="color: #888; font-size: 12px; margin-top: 5px;">
+                    Greife auf die Operator-Daten in der Cloud zu...
+                </div>
+                <div style="display: flex; gap: 15px; margin-top: 15px; font-size: 11px; color: #aaa; flex-wrap: wrap;">
+                    <div><i class="fas fa-shield-alt" style="color: var(--neon-blue);"></i> Verschlüsselung: Aktiv (SSL)</div>
+                    <div><i class="fas fa-terminal" style="color: var(--neon-pink);"></i> Status: <span id="hero-status-text" style="color: var(--neon-green); font-weight: bold;">Online</span></div>
+                        <div><i class="fas fa-dice" style="color: var(--neon-blue);"></i> Casino Chips: <span id="hero-casino-chips-display" style="color: #fff; font-weight: bold;">0</span></div>
+
+
+                </div>
+            </div>
+        </div>
+
+        <div class="profile-grid-complex">
+            <!-- Linke Spalte -->
+            <div class="cyber-panel-card">
+                <div class="panel-heading" style="color: var(--neon-blue);">
+                    <i class="fas fa-id-badge"></i> <span id="left-panel-title-text">Identitäts- & Perk-Setup</span>
+                </div>
+                
+                <!-- Admin Übernahme-Box -->
+                <div id="admin-profile-control-panel" class="hidden admin-override-box">
+                    <div style="color: var(--neon-pink); font-size: 12px; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; display: flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-user-shield"></i> Admin-Bearbeitungsmodus Aktiv
+                    </div>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button type="button" onclick="adminToggleTargetRole()" id="admin-role-toggle-btn" class="btn" style="flex: 1; font-size: 10px; padding: 7px; background: rgba(255,170,0,0.1); border: 1px solid #ffaa00; color: #ffaa00; cursor: pointer;">
+                            <i class="fas fa-shield-alt"></i> Rolle umschalten
+                        </button>
+                        <button type="button" onclick="adminDeleteTargetUser()" class="btn" style="flex: 1; font-size: 10px; padding: 7px; background: rgba(255,0,85,0.1); border: 1px solid #ff0055; color: #ff0055; cursor: pointer;">
+                            <i class="fas fa-trash-alt"></i> Account löschen
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Bearbeitungsformular -->
+                <form id="profile-edit-form" onsubmit="handleCustomProfileSave(event)">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <div>
+                            <img id="page-avatar-preview" src="" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 2px solid var(--neon-blue); margin-bottom: 10px; display: none;" onerror="this.src=DEFAULT_AVATAR;">
+                            <br>
+                            <label class="btn btn-neon-blue" style="font-size: 11px; padding: 6px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                                <i class="fas fa-cloud-upload-alt"></i> Avatar Bild hochladen 
+                                <input type="file" id="avatar-file-input" accept="image/*" onchange="previewGalleryImage(event)" style="display: none;">
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="cyber-input-group">
+                        <label>Studio-Benutzername</label>
+                        <input type="text" id="edit-username" required minlength="3" maxlength="32">
+                    </div>
+                    
+                    <div style="margin-top: 25px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+                        <div style="color: var(--neon-pink); font-size: 13px; font-weight: bold; margin-bottom: 12px; text-transform: uppercase; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-microchip"></i> Cyber-Charakter-Karte Slots
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; color:#ccc; font-size:12px;">
+                                <input type="checkbox" id="enable-char-card" onchange="updateCharCardPreview()"> Cyber-Karte in Forenbeiträgen anzeigen
+                            </label>
+                        </div>
+                        <div class="cyber-input-group">
+                            <label>Perk Slot 1</label>
+                            <select id="perk-slot-1" onchange="updateCharCardPreview()"></select>
+                        </div>
+                        <div class="cyber-input-group">
+                            <label>Perk Slot 2</label>
+                            <select id="perk-slot-2" onchange="updateCharCardPreview()"></select>
+                        </div>
+                        <div class="cyber-input-group">
+                            <label>Perk Slot 3</label>
+                            <select id="perk-slot-3" onchange="updateCharCardPreview()"></select>
+                        </div>
+                        <div id="char-card-display" style="margin-top: 10px;"></div>
+                    </div>
+
+                    <button type="submit" class="btn btn-neon-green full-width" style="margin-top: 20px; font-size: 12px; padding: 12px;">
+                        <i class="fas fa-save"></i> Änderungen in Cloud speichern
+                    </button>
+                </form>
+
+                <!-- Nur-Ansicht für fremde Profile -->
+                <div id="profile-view-only" class="hidden" style="text-align: center; padding: 10px 0;">
+                    <div id="view-cyber-card-container" style="text-align: left; margin-top: 10px;"></div>
+                </div>
+
+                <!-- Öffentliche Pinnwand -->
+                <div style="margin-top: 30px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px;">
+                    <div style="color: var(--neon-blue); font-size: 13px; font-weight: bold; margin-bottom: 12px; text-transform: uppercase; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-comments"></i> Pinnwand-Nachrichten
+                    </div>
+                    <div class="cyber-input-group" style="margin-bottom: 10px;">
+                        <textarea id="profilePinInput" class="cyber-textarea" placeholder="Hinterlasse eine Nachricht auf dieser Pinnwand..."></textarea>
+                    </div>
+                    <button type="button" onclick="sendProfilePinMessage()" class="btn btn-neon-blue full-width" style="font-size: 11px; padding: 8px; margin-bottom: 15px;">
+                        <i class="fas fa-paper-plane"></i> Nachricht posten
+                    </button>
+
+                    <div id="profilePinContainer" class="pinboard-wall-box">
+                        <div style="color: #666; font-size: 11px; text-align: center; padding: 10px;">Lade Pinnwand-Einträge...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rechte Spalte: Trophäen -->
+            <div class="cyber-panel-card pink-accent">
+                <div class="panel-heading" style="color: var(--neon-pink);">
+                    <i class="fas fa-trophy"></i> Trophäen & Achievements Matrix
+                </div>
+                <div id="achievements-container" style="max-height: 650px; overflow-y: auto; padding-right: 5px;"></div>
+            </div>
+        </div>
+    </main>
+
+<script src="js/app.js"></script>
+<script>
+    let profileTargetUsername = null;
+    let viewedUserData = null;
+    let isViewingOwnProfile = true;
+
+    // --- CYBER MODAL HELPER (ERSUCHT ALERT & CONFIRM) ---
+    function showCyberAlert(title, text, type = "info") {
+        const modal = document.getElementById("cyber-custom-modal");
+        const boxInner = document.getElementById("cyber-modal-box-inner");
+        const iconEl = document.getElementById("cyber-modal-icon");
+        const titleEl = document.getElementById("cyber-modal-title");
+        const textEl = document.getElementById("cyber-modal-text");
+        const actionsEl = document.getElementById("cyber-modal-actions");
+
+        boxInner.className = `cyber-comms-box ${type}`;
+        titleEl.textContent = title;
+        textEl.textContent = text;
+
+        if (type === "danger") {
+            iconEl.className = "fas fa-exclamation-triangle";
+            iconEl.style.color = "var(--neon-pink)";
+            iconEl.style.textShadow = "0 0 15px rgba(255,0,127,0.6)";
+            titleEl.style.color = "var(--neon-pink)";
+        } else if (type === "success") {
+            iconEl.className = "fas fa-check-circle";
+            iconEl.style.color = "var(--neon-green)";
+            iconEl.style.textShadow = "0 0 15px rgba(0,255,102,0.6)";
+            titleEl.style.color = "var(--neon-green)";
+        } else {
+            iconEl.className = "fas fa-satellite-dish";
+            iconEl.style.color = "var(--neon-blue)";
+            iconEl.style.textShadow = "0 0 15px rgba(0,240,255,0.6)";
+            titleEl.style.color = "var(--neon-blue)";
+        }
+
+        actionsEl.innerHTML = `
+            <button onclick="closeCyberModal()" class="btn btn-neon-blue" style="width: 100%; padding: 10px; font-size: 12px; cursor: pointer; font-weight: bold;">
+                <i class="fas fa-check"></i> Bestätigen
+            </button>
+        `;
+
+        modal.classList.remove("hidden");
+    }
+
+    function showCyberConfirm(title, text, onConfirmCallback) {
+        const modal = document.getElementById("cyber-custom-modal");
+        const boxInner = document.getElementById("cyber-modal-box-inner");
+        const iconEl = document.getElementById("cyber-modal-icon");
+        const titleEl = document.getElementById("cyber-modal-title");
+        const textEl = document.getElementById("cyber-modal-text");
+        const actionsEl = document.getElementById("cyber-modal-actions");
+
+        boxInner.className = "cyber-comms-box danger";
+        iconEl.className = "fas fa-shield-alt";
+        iconEl.style.color = "var(--neon-pink)";
+        iconEl.style.textShadow = "0 0 15px rgba(255,0,127,0.6)";
+        titleEl.textContent = title;
+        titleEl.style.color = "var(--neon-pink)";
+        textEl.textContent = text;
+
+        actionsEl.innerHTML = `
+            <button onclick="closeCyberModal()" class="btn" style="flex: 1; padding: 10px; font-size: 11px; background: rgba(255,255,255,0.05); border: 1px solid #555; color: #aaa; cursor: pointer;">
+                Abbrechen
+            </button>
+            <button id="cyber-confirm-yes-btn" class="btn" style="flex: 1; padding: 10px; font-size: 11px; background: rgba(255,0,127,0.2); border: 1px solid var(--neon-pink); color: var(--neon-pink); cursor: pointer; font-weight: bold;">
+                Ausführen
+            </button>
+        `;
+
+        modal.classList.remove("hidden");
+
+        document.getElementById("cyber-confirm-yes-btn").onclick = () => {
+            closeCyberModal();
+            if (typeof onConfirmCallback === "function") {
+                onConfirmCallback();
+            }
+        };
+    }
+
+    function closeCyberModal() {
+        document.getElementById("cyber-custom-modal").classList.add("hidden");
+    }
+
+    document.addEventListener("DOMContentLoaded", async () => {
+        let retries = 0;
+        while (!window.supabaseClient && retries < 30) {
+            await new Promise(r => setTimeout(r, 100));
+            retries++;
+        }
+
+        if (typeof checkActiveSession === "function") {
+            checkActiveSession();
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        let targetUser = urlParams.get("user");
+
+        if (!targetUser) {
+            sessionStorage.removeItem("437_view_profile");
+            if (currentUser && currentUser.username) {
+                targetUser = currentUser.username;
+            }
+        }
+
+        if (!targetUser) {
+            showCyberAlert("Zugriff verweigert", "🔒 Bitte logge dich ein, um auf Operator-Profile zuzugreifen.", "danger");
+            setTimeout(() => { window.location.href = "index.html"; }, 2000);
+            return;
+        }
+
+        const cleanTarget = targetUser.trim().toLowerCase();
+        const cleanCurrent = (currentUser && currentUser.username) ? currentUser.username.trim().toLowerCase() : null;
+
+        if (cleanCurrent && cleanTarget === cleanCurrent) {
+            sessionStorage.removeItem("437_view_profile");
+            isViewingOwnProfile = true;
+            loadOwnProfileData();
+        } else {
+            isViewingOwnProfile = false;
+            await loadForeignProfileData(targetUser.trim());
+        }
+    });
+
+    function isProfileUserOnline(lastActiveAt, username) {
+        if (currentUser && currentUser.username && username.toLowerCase() === currentUser.username.toLowerCase()) {
+            return true;
+        }
+        if (!lastActiveAt) return false;
+        const lastActiveDate = new Date(lastActiveAt);
+        const now = new Date();
+        const diffMinutes = (now - lastActiveDate) / 60000;
+        return diffMinutes >= 0 && diffMinutes <= 5;
+    }
+
+    function updateProfileOnlineStatusUI(lastActiveAt, username) {
+        const online = isProfileUserOnline(lastActiveAt, username);
+        const dot = document.getElementById("hero-status-dot");
+        const text = document.getElementById("hero-status-text");
+
+        if (dot) {
+            dot.className = `profile-status-dot ${online ? 'online' : 'offline'}`;
+            dot.title = online ? 'Online' : 'Offline';
+        }
+        if (text) {
+            text.textContent = online ? 'Online' : 'Offline';
+            text.style.color = online ? 'var(--neon-green)' : '#888';
+        }
+    }
+
+    function loadOwnProfileData() {
+        if (!currentUser) return;
+        profileTargetUsername = currentUser.username;
+
+        document.getElementById("hero-username-display").textContent = currentUser.username || "Operator";
+        document.getElementById("main-profile-hero-avatar").src = getSafeAvatar(currentUser.avatar);
+        document.getElementById("hero-subtitle-text").textContent = "Verwalte deine Identität, verifiziere deine Cyber-Perks und inspiziere deine Netzwerk-Aktivität.";
+        document.getElementById("hero-casino-chips-display").textContent = (typeof currentUser.casino_chips === "number" ? currentUser.casino_chips : 0).toLocaleString('de-DE');
+        
+        updateProfileOnlineStatusUI(new Date().toISOString(), currentUser.username);
+
+        const isUserAdmin = isAdmin(currentUser);
+        const badge = document.getElementById("hero-role-badge");
+        badge.textContent = isUserAdmin ? "ADMIN // ROOT" : "OPERATOR";
+        badge.className = `role-badge-cyber ${isUserAdmin ? 'badge-admin-cyber' : 'badge-user-cyber'}`;
+
+        const editForm = document.getElementById("profile-edit-form");
+        if (editForm) editForm.style.display = "block";
+
+        const viewOnly = document.getElementById("profile-view-only");
+        if (viewOnly) viewOnly.classList.add("hidden");
+
+        const adminBox = document.getElementById("admin-profile-control-panel");
+        if (adminBox) adminBox.classList.add("hidden");
+
+        const panelTitle = document.getElementById("left-panel-title-text");
+        if (panelTitle) panelTitle.textContent = "Identitäts- & Perk-Setup";
+
+        document.getElementById("edit-username").value = currentUser.username || "";
+        
+        let cChar = currentUser.cyber_char;
+        if (typeof cChar === "string") {
+            try { cChar = JSON.parse(cChar); } catch(e) { cChar = null; }
+        }
+
+        if (cChar) {
+            document.getElementById("enable-char-card").checked = cChar.enabled || false;
+        }
+
+        if (typeof populatePerkSelectDropdowns === "function") {
+            populatePerkSelectDropdowns();
+        }
+
+        if (cChar && Array.isArray(cChar.slots)) {
+            document.getElementById("perk-slot-1").value = cChar.slots[0] || "";
+            document.getElementById("perk-slot-2").value = cChar.slots[1] || "";
+            document.getElementById("perk-slot-3").value = cChar.slots[2] || "";
+        }
+
+        if (typeof updateCharCardPreview === "function") {
+            updateCharCardPreview();
+        }
+
+        renderProfileAchievements(currentUser.achievements || []);
+        loadProfilePinboard(currentUser.username);
+    }
+
+    async function loadForeignProfileData(username) {
+        profileTargetUsername = username;
+
+        const client = window.supabaseClient || supabaseClient;
+        if (!client) {
+            showCyberAlert("Fehler", "Supabase Client nicht verfügbar.", "danger");
+            return;
+        }
+
+        try {
+            const { data, error } = await client
+                .from("users")
+                .select("*")
+                .ilike("username", username)
+                .maybeSingle();
+
+            if (error || !data) {
+                showCyberAlert("Nicht gefunden", "🚨 Operator Dossier '" + username + "' in der Matrix nicht gefunden.", "danger");
+                setTimeout(() => { window.location.href = "mitglieder.html"; }, 2000);
+                return;
+            }
+
+            viewedUserData = data;
+
+            document.getElementById("hero-username-display").textContent = data.username;
+            document.getElementById("main-profile-hero-avatar").src = getSafeAvatar(data.avatar);
+            document.getElementById("hero-subtitle-text").textContent = `Öffentliches Operator Dossier von ${data.username}.`;
+            document.getElementById("hero-casino-chips-display").textContent = (typeof data.casino_chips === "number" ? data.casino_chips : 0).toLocaleString('de-DE');
+
+            updateProfileOnlineStatusUI(data.last_active_at, data.username);
+
+            const isTargetAdmin = isAdmin({ username: data.username, is_admin: data.is_admin });
+            const badge = document.getElementById("hero-role-badge");
+            badge.textContent = isTargetAdmin ? "ADMIN // ROOT" : "OPERATOR";
+            badge.className = `role-badge-cyber ${isTargetAdmin ? 'badge-admin-cyber' : 'badge-user-cyber'}`;
+
+            let foreignChar = data.cyber_char;
+            if (typeof foreignChar === "string") {
+                try { foreignChar = JSON.parse(foreignChar); } catch(e) { foreignChar = null; }
+            }
+
+            const viewerIsAdmin = currentUser && typeof isAdmin === "function" && isAdmin(currentUser);
+            const editForm = document.getElementById("profile-edit-form");
+            const viewOnly = document.getElementById("profile-view-only");
+            const adminBox = document.getElementById("admin-profile-control-panel");
+            const panelTitle = document.getElementById("left-panel-title-text");
+
+            if (viewerIsAdmin) {
+                if (editForm) editForm.style.display = "block";
+                if (viewOnly) viewOnly.classList.add("hidden");
+                if (adminBox) adminBox.classList.remove("hidden");
+                if (panelTitle) panelTitle.textContent = "Admin-Bearbeitungsmodus";
+
+                document.getElementById("edit-username").value = data.username || "";
+                if (foreignChar) {
+                    document.getElementById("enable-char-card").checked = foreignChar.enabled || false;
+                }
+                if (typeof populatePerkSelectDropdowns === "function") {
+                    populatePerkSelectDropdowns();
+                }
+                if (foreignChar && Array.isArray(foreignChar.slots)) {
+                    document.getElementById("perk-slot-1").value = foreignChar.slots[0] || "";
+                    document.getElementById("perk-slot-2").value = foreignChar.slots[1] || "";
+                    document.getElementById("perk-slot-3").value = foreignChar.slots[2] || "";
+                }
+                if (typeof updateCharCardPreview === "function") {
+                    updateCharCardPreview();
+                }
+
+                const toggleBtn = document.getElementById("admin-role-toggle-btn");
+                if (toggleBtn) {
+                    toggleBtn.innerHTML = `<i class="fas fa-shield-alt"></i> ${isTargetAdmin ? 'Admin-Rechte entziehen' : 'Zum Admin befördern'}`;
+                }
+            } else {
+                if (editForm) editForm.style.display = "none";
+                if (viewOnly) viewOnly.classList.remove("hidden");
+                if (adminBox) adminBox.classList.add("hidden");
+                if (panelTitle) panelTitle.textContent = "Operator Dossier & Perks";
+
+                const cyberDisplay = document.getElementById("view-cyber-card-container");
+                if (cyberDisplay && foreignChar && foreignChar.enabled && Array.isArray(foreignChar.slots)) {
+                    let perksHtml = foreignChar.slots.filter(s => s).map(sId => {
+                        let perkObj = typeof CYBER_PERKS_POOL !== "undefined" ? CYBER_PERKS_POOL.find(p => p.id === sId) : null;
+                        return `
+                            <div style="background: rgba(0,240,255,0.05); border-left: 2px solid var(--neon-blue); padding: 8px 12px; border-radius: 4px; margin-top: 6px; font-size: 11px;">
+                                <i class="fas fa-bolt" style="color: var(--neon-blue);"></i> <span style="font-weight:bold; color:#fff;">${perkObj ? perkObj.name : sId}</span>
+                                <div style="color: #aaa; font-size: 10px; margin-top: 2px;">${perkObj ? perkObj.buff : ''}</div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    cyberDisplay.innerHTML = `
+                        <div style="background: #04040a; border: 1px solid var(--neon-blue); padding: 12px; border-radius: 6px;">
+                            <div style="font-size: 10px; color: #888; text-transform: uppercase; margin-bottom: 8px;"><i class="fas fa-microchip"></i> Aktive Cyber-Perks:</div>
+                            ${perksHtml || '<span style="color: #666; font-size: 11px;">Keine Perks ausgerüstet.</span>'}
+                        </div>
+                    `;
+                } else if (cyberDisplay) {
+                    cyberDisplay.innerHTML = `<div style="color: #666; font-size: 11px; font-style: italic; padding: 10px; text-align: center;">Cyber-Karte ist bei diesem Operator deaktiviert.</div>`;
+                }
+            }
+
+            renderProfileAchievements(data.achievements || []);
+            loadProfilePinboard(data.username);
+
+        } catch (err) {
+            console.error("Fehler beim Laden des fremden Profils:", err);
+        }
+    }
+
+    async function handleCustomProfileSave(event) {
+        event.preventDefault();
+        if (typeof saveProfileChanges === "function") {
+            await saveProfileChanges(event);
+        }
+    }
+
+    // Überschreibt alert elegant mit dem Cyber Modal
+    const originalAlert = window.alert;
+    window.alert = function(msg) {
+        if (typeof msg === "string" && (msg.includes("Profil erfolgreich") || msg.includes("gespeichert") || msg.includes("aktualisiert"))) {
+            showCyberAlert("Profil Gespeichert", "Deine Änderungen wurden erfolgreich in der Cloud-Matrix synchronisiert.", "success");
+        } else {
+            showCyberAlert("System Meldung", msg, "info");
+        }
+    };
+
+    function adminToggleTargetRole() {
+        if (!supabaseClient || !viewedUserData) return;
+        const currentAdmin = viewedUserData.is_admin === true;
+        const newStatus = !currentAdmin;
+
+        showCyberConfirm(
+            "Rolle ändern",
+            `Möchtest du die Admin-Rechte für '${viewedUserData.username}' wirklich ${newStatus ? 'aktivieren' : 'entziehen'}?`,
+            async () => {
+                const { error } = await supabaseClient
+                    .from("users")
+                    .update({ is_admin: newStatus })
+                    .ilike("username", viewedUserData.username);
+
+                if (error) {
+                    showCyberAlert("Fehler", "❌ Fehler: " + error.message, "danger");
+                    return;
+                }
+
+                showCyberAlert("Erfolg", "✅ Rolle erfolgreich aktualisiert.", "success");
+                setTimeout(() => { location.reload(); }, 1500);
+            }
+        );
+    }
+
+    function adminDeleteTargetUser() {
+        if (!supabaseClient || !viewedUserData) return;
+
+        showCyberConfirm(
+            "Account löschen",
+            `🚨 ACHTUNG: Möchtest du den Operator '${viewedUserData.username}' unwiderruflich aus der Datenbank löschen?`,
+            async () => {
+                const { error } = await supabaseClient
+                    .from("users")
+                    .delete()
+                    .ilike("username", viewedUserData.username);
+
+                if (error) {
+                    showCyberAlert("Fehler", "❌ Fehler beim Löschen: " + error.message, "danger");
+                    return;
+                }
+
+                showCyberAlert("Erfolg", `🗑️ Operator '${viewedUserData.username}' wurde gelöscht.`, "success");
+                setTimeout(() => { window.location.href = "mitglieder.html"; }, 1500);
+            }
+        );
+    }
+
+    async function loadProfilePinboard(recipientName) {
+        const container = document.getElementById("profilePinContainer");
+        const client = window.supabaseClient || supabaseClient;
+        if (!container || !client) return;
+
+        const { data, error } = await client
+            .from("profile_messages")
+            .select("*")
+            .ilike("recipient_username", recipientName)
+            .order("created_at", { ascending: false });
+
+        if (error) {
+            container.innerHTML = `<div style="color: #ff5577; font-size: 11px; text-align: center;">Fehler beim Laden der Pinnwand.</div>`;
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            container.innerHTML = `<div style="color: #666; font-size: 11px; text-align: center; padding: 15px;">Noch keine Pinnwand-Einträge vorhanden.</div>`;
+            return;
+        }
+
+        container.innerHTML = "";
+        data.forEach(msg => {
+            const dateStr = msg.created_at ? new Date(msg.created_at).toLocaleDateString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "";
+            const bubble = document.createElement("div");
+            bubble.className = "pinboard-msg-bubble";
+
+            const currentNameLower = currentUser ? currentUser.username.trim().toLowerCase() : "";
+            const senderLower = (msg.sender_username || "").trim().toLowerCase();
+            const recipientLower = (msg.recipient_username || "").trim().toLowerCase();
+            const userIsAdmin = currentUser && typeof isAdmin === "function" && isAdmin(currentUser);
+
+            const canDelete = currentUser && (currentNameLower === senderLower || currentNameLower === recipientLower || userIsAdmin);
+
+            let deleteBtnHtml = "";
+            if (canDelete) {
+                deleteBtnHtml = `<button onclick="confirmDeletePinMessage('${msg.id}')" class="pinboard-delete-btn" title="Nachricht löschen"><i class="fas fa-trash-alt"></i></button>`;
+            }
+
+            bubble.innerHTML = `
+                <div class="pinboard-author">
+                    <span><i class="fas fa-user-circle"></i> ${escapeHTML(msg.sender_username)}</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="color: #555; font-size: 9px;">${dateStr}</span>
+                        ${deleteBtnHtml}
+                    </div>
+                </div>
+                <div style="color: #ddd; word-break: break-word; margin-top: 4px;">${escapeHTML(msg.message)}</div>
+            `;
+            container.appendChild(bubble);
+        });
+    }
+
+    async function sendProfilePinMessage() {
+        if (!currentUser) {
+            showCyberAlert("Login erforderlich", "🔒 Du musst eingeloggt sein, um auf Pinnwände zu schreiben!", "danger");
+            if (typeof openAuthModal === "function") openAuthModal("login");
+            return;
+        }
+
+        const recipient = profileTargetUsername || currentUser.username;
+        const textarea = document.getElementById("profilePinInput");
+        const message = textarea.value.trim();
+
+        if (!message) {
+            showCyberAlert("Hinweis", "Bitte gib eine Nachricht ein.", "info");
+            return;
+        }
+
+        const client = window.supabaseClient || supabaseClient;
+        if (!client) return;
+
+        const { error } = await client
+            .from("profile_messages")
+            .insert([{
+                recipient_username: recipient,
+                sender_username: currentUser.username,
+                message: message
+            }]);
+
+        if (error) {
+            showCyberAlert("Fehler", "❌ Fehler beim Senden: " + error.message, "danger");
+            return;
+        }
+
+        textarea.value = "";
+        loadProfilePinboard(recipient);
+    }
+
+    function confirmDeletePinMessage(messageId) {
+        showCyberConfirm(
+            "Nachricht löschen?",
+            "Möchtest du diesen Pinnwand-Eintrag wirklich unwiderruflich aus der Matrix löschen?",
+            async () => {
+                const client = window.supabaseClient || supabaseClient;
+                if (!client) return;
+
+                const { error } = await client
+                    .from("profile_messages")
+                    .delete()
+                    .eq("id", messageId);
+
+                if (error) {
+                    showCyberAlert("Fehler", "❌ Fehler beim Löschen: " + error.message, "danger");
+                    return;
+                }
+
+                loadProfilePinboard(profileTargetUsername);
+            }
+        );
+    }
+
+    function renderProfileAchievements(userAchievements) {
+        const container = document.getElementById("achievements-container");
+        if (!container || typeof ACHIEVEMENTS_LIST === "undefined") return;
+
+        container.innerHTML = "";
+        const achievementsList = Array.isArray(userAchievements) ? userAchievements : [];
+
+        Object.keys(ACHIEVEMENTS_LIST).forEach(key => {
+            const ach = ACHIEVEMENTS_LIST[key];
+            const isUnlocked = achievementsList.includes(key);
+
+            const item = document.createElement("div");
+            item.className = `achievement-card-item ${isUnlocked ? 'unlocked' : 'locked'}`;
+            item.innerHTML = `
+                <div style="font-size: 26px; color: ${isUnlocked ? ach.color : '#444'}; text-shadow: ${isUnlocked ? '0 0 10px ' + ach.color : 'none'}; width: 40px; text-align: center; flex-shrink: 0;">
+                    <i class="fas ${ach.icon}"></i>
+                </div>
+                <div style="flex-grow: 1; min-width: 0;">
+                    <div style="color: ${isUnlocked ? '#fff' : '#666'}; font-weight: bold; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHTML(ach.title)}</span>
+                        <span style="font-size: 9px; padding: 2px 6px; border-radius: 4px; background: ${isUnlocked ? 'rgba(0,255,102,0.1)' : 'rgba(255,255,255,0.03)'}; color: ${isUnlocked ? 'var(--neon-green)' : '#666'}; border: 1px solid ${isUnlocked ? 'var(--neon-green)' : '#333'}; flex-shrink: 0; text-transform: uppercase;">
+                            ${isUnlocked ? 'FREIGESCHALTET' : 'GESPERRT'}
+                        </span>
+                    </div>
+                    <div style="color: #888; font-size: 11px; margin-top: 4px; word-break: break-word; line-height: 1.4;">${escapeHTML(ach.desc)}</div>
+                </div>
+            `;
+            container.appendChild(item);
+        });
+    }
+</script>
+</body>
+</html>

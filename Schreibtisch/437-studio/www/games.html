@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>437 Studio | Arcade Launcher & Cloud Leaderboard</title>
+    <link rel="icon" type="image/png" href="/img/logo.png">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/maintenance.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        .arcade-wrapper-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 25px;
+            max-width: 1400px;
+            width: 100%;
+            margin: 110px auto 40px auto;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        @media(max-width: 1050px) {
+            .arcade-wrapper-grid { 
+                grid-template-columns: 1fr !important; 
+                margin-top: 90px !important; 
+                padding: 0 15px !important;
+                gap: 20px !important;
+            }
+        }
+        
+        /* Leaderboard Styling */
+        .leaderboard-panel {
+            background: #0c0c18;
+            border: 2px solid #00f0ff;
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.15);
+            border-radius: 8px;
+            padding: 22px;
+            height: fit-content;
+            box-sizing: border-box;
+            width: 100%;
+            overflow: hidden;
+        }
+        .leaderboard-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #1a1a3a;
+            padding-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            background: transparent;
+            border: 1px solid #333;
+            color: #666;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-family: monospace;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: 0.2s;
+        }
+        .tab-btn.active {
+            border-color: #00f0ff;
+            color: #00f0ff;
+            text-shadow: 0 0 5px #00f0ff;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.1);
+        }
+        
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            text-align: left;
+            table-layout: fixed;
+        }
+        .leaderboard-table th {
+            color: #555;
+            font-size: 11px;
+            text-transform: uppercase;
+            padding: 8px;
+            border-bottom: 1px solid #222;
+        }
+        .leaderboard-table td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #141428;
+            color: #ccc;
+            word-break: break-word;
+        }
+        .rank-badge {
+            font-weight: bold;
+            font-family: monospace;
+            display: inline-block;
+            width: 20px;
+        }
+        .rank-1 { color: #ffd700; text-shadow: 0 0 5px #ffd700; }
+        .rank-2 { color: #c0c0c0; text-shadow: 0 0 5px #c0c0c0; }
+        .rank-3 { color: #cd7f32; text-shadow: 0 0 5px #cd7f32; }
+
+        .games-container {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* --- FUTURISTISCHE SPIELE-KARTEN ANIMATION --- */
+        @keyframes cardEntrance {
+            0% {
+                opacity: 0;
+                transform: translateY(30px) scale(0.97);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            box-sizing: border-box;
+        }
+
+        .game-card {
+            background: #0c0c18;
+            border: 1px solid #222;
+            border-radius: 8px;
+            padding: 15px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            opacity: 0; /* Startet unsichtbar für die Animation */
+            animation: cardEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+            overflow: hidden;
+        }
+        .game-card:hover {
+            transform: translateY(-4px);
+            border-color: #00f0ff;
+            box-shadow: 0 0 25px rgba(0, 240, 255, 0.25);
+        }
+        .game-banner {
+            position: relative;
+            width: 100%;
+        }
+        .game-tag {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(5,5,15,0.85);
+            padding: 3px 8px;
+            font-size: 10px;
+            font-family: monospace;
+            border-radius: 4px;
+            border: 1px solid #555;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="grid-overlay"></div>
+
+    <nav class="navbar">
+        <div class="logo">437<span>Studio</span></div>
+        <div class="menu-toggle"><i class="fas fa-bars"></i></div>
+        <ul class="nav-links">
+            <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="forum.html"><i class="fas fa-comments"></i> Forum</a></li>
+            <li><a href="games.html" class="active"><i class="fas fa-gamepad"></i> Games</a></li>
+            <li><a href="mitglieder.html"><i class="fas fa-users"></i> Mitglieder</a></li>  
+            <li><a href="music.html"><i class="fas fa-music"></i> Musik</a></li>
+            <li><a href="discord.html"><i class="fab fa-discord"></i> Discord</a></li>
+            <li class="auth-container">
+                <div id="logged-out-zone">
+                    <button class="btn btn-neon-blue" onclick="redirectToLogin()">Login / Register</button>
+                </div>
+                <div id="logged-in-zone" class="hidden user-trigger" onclick="toggleProfileDropdown()">
+                    <img id="nav-avatar" src="" alt="Avatar">
+                    <span id="nav-username">User</span> 
+                    <span id="admin-badge" class="hidden" style="color:#ff007f; font-size:10px; border:1px solid #ff007f; padding:2px 4px; border-radius:4px; margin-left:5px;">ADMIN</span>
+                    <span id="dropdown-msg-badge" class="hidden"></span>
+                    <div id="profile-dropdown" class="dropdown-menu hidden"></div>
+                </div>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Mobiler Zurück-Button -->
+    <button class="mobile-back-btn" onclick="history.back()">
+        <i class="fas fa-arrow-left"></i> Zurück
+    </button>
+
+    <!-- Der zweispaltige Hauptarbeitsbereich -->
+    <div class="arcade-wrapper-grid">
+        
+        <!-- LINKE SPALTE: Spiele-Katalog Launcher -->
+        <div class="games-container">
+            <div class="games-header">
+                <h1 class="neon-text-green"> 437_LAUNCHER</h1>
+                <p class="subtitle" style="color:#666; margin-top:5px;">Offizielles Spiele-Repository von Nalix437 & Amnesia437</p>
+            </div>
+
+            <div class="games-filter-bar" style="margin-top: 20px; display: flex; flex-wrap: wrap; gap: 8px;">
+                <button class="filter-btn active" onclick="filterGames('all', event)">Alle Spiele</button>
+                <button class="filter-btn" onclick="filterGames('action', event)">Action</button>
+                <button class="filter-btn" onclick="filterGames('horror', event)">Horror</button>
+                <button class="filter-btn" onclick="filterGames('retro', event)">Retro Arcade</button>
+                <button class="filter-btn" onclick="filterGames('alpha', event)">Alpha / Beta</button>
+            </div>
+
+            <div id="games-grid" class="games-grid" style="margin-top: 25px;">
+                <!-- Dynamischer Content von games.js -->
+            </div>
+        </div>
+
+        <!-- RECHTE SPALTE: Das Cloud-Leaderboard Panel -->
+        <div class="leaderboard-panel">
+            <h2 class="neon-text-blue" style="font-size: 18px; text-transform: uppercase; margin-bottom: 15px;"><i class="fas fa-trophy"></i> 437 Leaderboard</h2>
+            
+            <div class="leaderboard-tabs">
+                <button class="tab-btn active" id="tab-harvest" onclick="switchLeaderboardTab('harvest')">Green Harvest</button>
+                <button class="tab-btn" id="tab-clicker" onclick="switchLeaderboardTab('clicker')">Amnesia Clicker</button>
+            </div>
+
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th style="width: 45px;">Rang</th>
+                        <th>Hacker-Name</th>
+                        <th style="text-align: right; width: 90px;">Highscore</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboard-target-rows">
+                    <!-- Auslesung via games.js -->
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <!-- Skripte -->
+    <script src="/js/app.js"></script>
+    <script src="/js/games.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            setTimeout(() => {
+                if (typeof initGamesModule === "function") {
+                    initGamesModule();
+                }
+            }, 50);
+        });
+    </script>
+</body>
+</html>

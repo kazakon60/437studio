@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>437 Studio | Green Harvest Arcade</title>
+    <link rel="icon" type="image/png" href="/img/logo.png">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* --- GREEN HARVEST ARCADE STYLES --- */
+        .harvest-container {
+            max-width: 1200px;
+            margin: 110px auto 40px auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 25px;
+        }
+
+        .arcade-panel {
+            background: #0c0c18;
+            border: 2px solid #00ff66;
+            box-shadow: 0 0 20px rgba(0, 255, 102, 0.15);
+            border-radius: 8px;
+            padding: 25px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .canvas-area {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #04040c;
+            border: 1px solid #1a3a2a;
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+            margin-top: 15px;
+        }
+
+        #harvest-canvas {
+            display: block;
+            width: 100%;
+            max-width: 600px;
+            height: auto;
+            aspect-ratio: 4 / 3;
+            background: #060b07;
+        }
+
+        .harvest-stats-bar {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            background: #050b07;
+            font-family: monospace;
+            padding: 12px;
+            border-radius: 4px;
+            border-left: 3px solid #00ff66;
+            font-size: 14px;
+            color: #00ff66;
+            margin-bottom: 15px;
+        }
+
+        .shop-area {
+            background: #0c0c18;
+            border: 2px solid #00f0ff;
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.15);
+            border-radius: 8px;
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .harvest-shop-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 15px;
+            max-height: 450px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .harvest-shop-item {
+            background: #06060f;
+            border: 1px solid #1a1a3a;
+            padding: 12px 15px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* --- RESPONSIVITÄT FÜR MOBILGERÄTE --- */
+        @media (max-width: 900px) {
+            .harvest-container {
+                grid-template-columns: 1fr !important;
+                margin-top: 90px !important;
+                padding: 0 10px !important;
+                gap: 20px !important;
+            }
+
+            .arcade-panel, .shop-area {
+                padding: 15px !important;
+            }
+
+            h1 { font-size: 26px !important; }
+            h2 { font-size: 20px !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="grid-overlay"></div>
+
+    <!-- Navigation Bar -->
+  <nav class="navbar">
+        <div class="logo">437<span>Studio</span></div>
+        <div class="menu-toggle"><i class="fas fa-bars"></i></div>
+        <ul class="nav-links">
+            <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="forum.html"><i class="fas fa-comments"></i> Forum</a></li>
+            <li><a href="games.html"><i class="fas fa-gamepad"></i> Games</a></li>
+            <li><a href="mitglieder.html"><i class="fas fa-users"></i> Mitglieder</a></li>  
+            <li><a href="music.html"><i class="fas fa-music"></i> Musik</a></li>
+            <li><a href="discord.html"><i class="fab fa-discord"></i> Discord</a></li>
+            <li class="auth-container">
+                <div id="logged-out-zone">
+                    <button class="btn btn-neon-blue" onclick="redirectToLogin()">Login / Register</button>
+                </div>
+                <!-- Das Badge liegt hier direkt im Haupt-Trigger-Button für permanente Sichtbarkeit -->
+                <div id="logged-in-zone" class="hidden user-trigger" onclick="toggleProfileDropdown()">
+                    <img id="nav-avatar" src="" alt="Avatar">
+                    <span id="nav-username">User</span> 
+                    <span id="admin-badge" class="hidden" style="color:#ff007f; font-size:10px; border:1px solid #ff007f; padding:2px 4px; border-radius:4px; margin-left:5px;">ADMIN</span>
+                    <span id="dropdown-msg-badge" class="hidden"></span>
+                    <div id="profile-dropdown" class="dropdown-menu hidden"></div>
+                </div>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Mobiler Zurück-Button -->
+    <button class="mobile-back-btn" onclick="history.back()">
+        <i class="fas fa-arrow-left"></i> Zurück
+    </button>
+
+    <!-- HAUPTBEREICH GREEN HARVEST -->
+    <div class="harvest-container">
+        
+        <!-- LINKE SPALTE: SPIELFELD / CANVAS -->
+        <div class="arcade-panel">
+            <h2 class="neon-text-green" style="text-transform: uppercase; letter-spacing: 1px; font-size: 22px; margin-bottom: 10px;">
+                <i class="fas fa-seedling"></i> Green Harvest Arcade
+            </h2>
+            
+            <div class="harvest-stats-bar">
+                <span>🌿 HARVEST COINS: <strong id="harvest-coins-display" style="color:#fff;">0</strong></span>
+                <span>⚡ YIELD / SEC: <strong id="harvest-hps-display" style="color:#fff;">0</strong></span>
+            </div>
+
+            <div class="canvas-area">
+                <canvas id="harvest-canvas" width="600" height="450"></canvas>
+            </div>
+
+            <p style="color: #666; font-size: 11px; margin-top: 15px; text-align: center; font-family: monospace;">
+                [SYSTEM]: Klicke auf reife Pflanzen oder kaufe Automatisierungen im Shop rechts.
+            </p>
+        </div>
+
+        <!-- RECHTE SPALTE: UPGRADE SHOP -->
+        <div class="shop-area">
+            <h2 class="neon-text-blue" style="text-transform: uppercase; font-size: 18px; margin-bottom: 5px; text-align: center;">
+                <i class="fas fa-store"></i> Grow Shop
+            </h2>
+            <p style="color: #666; font-size: 11px; text-align: center; margin-bottom: 10px; font-family: monospace;">Erweitere deine Plantage</p>
+            
+            <div class="harvest-shop-list" id="harvest-shop-target">
+                <!-- Wird dynamisch über harvest.js gefüllt -->
+            </div>
+        </div>
+        <!-- LEADERBOARD FÜR GREEN HARVEST -->
+        <div class="shop-area" style="margin-top: 25px; border-color: #ffd700; box-shadow: 0 0 20px rgba(255, 215, 0, 0.15);">
+            <h2 style="color: #ffd700; text-shadow: 0 0 5px #ffd700; text-transform: uppercase; font-size: 18px; margin-bottom: 5px; text-align: center;">
+                <i class="fas fa-trophy"></i> Harvest Leaderboard
+            </h2>
+            <p style="color: #666; font-size: 11px; text-align: center; margin-bottom: 10px; font-family: monospace;">Top Ernte-Meister</p>
+            
+            <div id="harvest-leaderboard-list" style="font-family: monospace; font-size: 13px;">
+                <div style="color: #888; text-align: center; padding: 10px;">Lade Bestenliste...</div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/js/app.js"></script>
+    <script src="/js/harvest.js"></script>
+</body>
+</html>

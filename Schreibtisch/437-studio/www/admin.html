@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>437 Studio | Admin Control Panel</title>
+    <link rel="icon" type="image/png" href="/img/logo.png">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/maintenance.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-main: #0c0c18;
+            --bg-card: #0c0c18;
+            --border-pink: #ff007f;
+            --border-cyan: #00f0ff;
+            --text-main: #fff;
+            --text-muted: #aaa;
+        }
+
+        body {
+            background-color: #06060c;
+            color: var(--text-main);
+            font-family: monospace;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        .admin-container {
+            max-width: 1300px;
+            margin: 90px auto 40px auto;
+            padding: 0 15px;
+            box-sizing: border-box;
+            width: 100%;
+        }
+
+        .admin-header-box {
+            text-align: center;
+            margin-bottom: 25px;
+            background: linear-gradient(135deg, rgba(12, 12, 24, 0.95) 0%, rgba(25, 10, 35, 0.95) 100%);
+            border: 1px solid var(--border-pink);
+            padding: 25px 15px;
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(255, 0, 127, 0.25);
+            box-sizing: border-box;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-cyan);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.12);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 22px rgba(0, 240, 255, 0.3);
+        }
+
+        .stat-number {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--border-cyan);
+            margin-top: 8px;
+            text-shadow: 0 0 10px rgba(0,240,255,0.4);
+        }
+
+        .admin-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-pink);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 0 25px rgba(255, 0, 127, 0.15);
+            box-sizing: border-box;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        /* --- PERFEKT SKALIERBARE DATENBANK-TABELLE --- */
+        .table-responsive-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-top: 12px;
+            border: 1px solid #1a1a3a;
+            border-radius: 6px;
+            background: #080812;
+        }
+
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 12px;
+            min-width: 650px; /* Erzwingt sauberes Scrollen auf Smartphones statt Quetschung */
+        }
+
+        .admin-table th {
+            background: #141428;
+            color: var(--border-cyan);
+            padding: 12px 10px;
+            border-bottom: 2px solid var(--border-cyan);
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .admin-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #1a1a3a;
+            color: #fff;
+            vertical-align: middle;
+        }
+
+        .admin-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        
+        /* Neon-Mod-Buttons in der Tabelle */
+        .admin-action-bar {
+            display: flex;
+            gap: 5px;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .admin-action-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 4px;
+            padding: 6px 9px;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: monospace;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .admin-action-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .user-search-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        .user-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #080814;
+            border: 1px solid var(--border-pink);
+            border-radius: 0 0 6px 6px;
+            max-height: 160px;
+            overflow-y: auto;
+            z-index: 100;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.8);
+        }
+
+        .user-suggestions.hidden {
+            display: none;
+        }
+
+        .suggestion-item {
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #1a1a3a;
+            color: #fff;
+            transition: 0.2s;
+        }
+
+        .suggestion-item:hover {
+            background: rgba(255, 0, 127, 0.15);
+            color: var(--border-pink);
+        }
+
+        /* Mobile Feinabstimmung */
+        @media(max-width: 768px) {
+            .admin-container {
+                margin-top: 75px;
+                padding: 0 8px;
+            }
+            .admin-card, .admin-header-box {
+                padding: 14px;
+            }
+            .admin-table th, .admin-table td {
+                padding: 10px 8px;
+                font-size: 11px;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="grid-overlay"></div>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="logo">437<span>Studio</span></div>
+        <div class="menu-toggle"><i class="fas fa-bars"></i></div>
+        <ul class="nav-links">
+            <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="forum.html"><i class="fas fa-comments"></i> Forum</a></li>
+            <li><a href="games.html"><i class="fas fa-gamepad"></i> Games</a></li>
+            <li><a href="mitglieder.html"><i class="fas fa-users"></i> Mitglieder</a></li>  
+            <li><a href="music.html"><i class="fas fa-music"></i> Musik</a></li>
+            <li><a href="discord.html"><i class="fab fa-discord"></i> Discord</a></li>
+            <li class="auth-container">
+                <div id="logged-out-zone">
+                    <button class="btn btn-neon-blue" onclick="redirectToLogin()">Login / Register</button>
+                </div>
+                <div id="logged-in-zone" class="hidden user-trigger" onclick="toggleProfileDropdown()">
+                    <img id="nav-avatar" src="" alt="Avatar">
+                    <span id="nav-username">User</span> 
+                    <span id="admin-badge" class="hidden" style="color:#ff007f; font-size:10px; border:1px solid #ff007f; padding:2px 4px; border-radius:4px; margin-left:5px;">ADMIN</span>
+                    <span id="dropdown-msg-badge" class="hidden"></span>
+                    <div id="profile-dropdown" class="dropdown-menu hidden"></div>
+                </div>
+            </li>
+        </ul>
+    </nav>
+
+    <div id="ticker-insertion-point"></div>
+
+    <main class="admin-container">
+        <!-- Header Matrix -->
+        <div class="admin-header-box">
+            <h1 class="neon-text-pink" style="font-size: clamp(18px, 4vw, 24px); text-transform: uppercase; margin-bottom: 8px;"><i class="fas fa-shield-alt"></i> Operative Control Matrix</h1>
+            <p style="color: var(--text-muted); font-size: clamp(11px, 2vw, 12px); margin: 0;">Zentrale Befehls- und Steuereinheit für Root-Administratoren des 437 Studio Netzwerks.</p>
+        </div>
+
+        <!-- Analytics Grid / Statistik-Karten -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div style="color: var(--text-muted); font-size: 12px;"><i class="fas fa-users"></i> Registrierte Operatoren</div>
+                <div id="stat-users" class="stat-number">...</div>
+            </div>
+            <div class="stat-card" style="border-color: var(--border-pink); box-shadow: 0 0 15px rgba(255, 0, 127, 0.1);">
+                <div style="color: var(--text-muted); font-size: 12px;"><i class="fas fa-comments"></i> Foren-Threads</div>
+                <div id="stat-posts" class="stat-number" style="color: var(--border-pink);">...</div>
+            </div>
+        </div>
+
+        <!-- Wartungsmodus Steuerung -->
+        <div class="admin-card">
+            <h3 style="color: var(--border-pink); font-size: 15px; margin-bottom: 12px;"><i class="fas fa-tools"></i> Wartungsmodus Status</h3>
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                <span id="maintenance-status-label" style="color: #ccc; font-size: 12px;">Lade Status...</span>
+                <button id="maintenance-toggle-btn" onclick="toggleGlobalMaintenance()" class="btn btn-neon-pink" style="font-size: 11px; padding: 6px 12px;">Umschalten</button>
+            </div>
+        </div>
+
+        <!-- Globale Channel- & Gruppen-Verwaltung -->
+        <div class="admin-card">
+            <h3 style="color: var(--border-cyan); font-size: 15px; margin-bottom: 12px;"><i class="fas fa-hashtag"></i> Globale Channel-Verwaltung</h3>
+            <p style="color: #888; font-size: 11px; margin-bottom: 15px;">Übersicht aller privaten Channels und Server. Als Administrator kannst du hier jeden Channel einsehen, Mitglieder verwalten oder ihn komplett auflösen.</p>
+            <div id="admin-channels-list" style="font-size: 12px; color: var(--text-muted); width: 100%;">
+                Lade Channel-Daten...
+            </div>
+        </div>
+
+        <!-- System-Broadcast Sektion mit Bild-, Video- & Sprach-Upload -->
+        <div class="admin-card">
+            <h3 style="color: var(--border-pink); font-size: 15px; margin-bottom: 12px;"><i class="fas fa-bullhorn"></i> Offizielle System-Nachricht senden (437 Studio)</h3>
+            <form onsubmit="sendSystemBroadcast(event)" style="display: flex; flex-direction: column; gap: 10px;">
+                <div class="user-search-wrapper">
+                    <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Empfänger (Username, "ALL" für alle oder tippen für Vorschläge)</label>
+                    <input type="text" id="broadcast-recipient" autocomplete="off" required placeholder="z.B. ALL oder OperatorName..." oninput="handleAdminUserSearch(event)" style="width: 100%; background: #121224; border: 1px solid #333; color: #fff; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 12px; box-sizing: border-box;">
+                    <div id="admin-user-suggestions" class="user-suggestions hidden"></div>
+                </div>
+                <div>
+                    <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Nachrichtentext (Optional bei Bild/Video/Audio)</label>
+                    <textarea id="broadcast-text" rows="3" placeholder="Offizielle Systemmitteilung verfassen..." style="width: 100%; background: #121224; border: 1px solid #333; color: #fff; padding: 8px; border-radius: 4px; font-family: monospace; font-size: 12px; resize: vertical; box-sizing: border-box;"></textarea>
+                </div>
+
+                <!-- Bild-Vorschau Bereich -->
+                <div id="admin-img-preview-box" style="display: none; align-items: center; gap: 10px; background: #080812; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-pink);">
+                    <img id="admin-img-preview" src="" style="height: 40px; border-radius: 4px; object-fit: cover;">
+                    <span style="color: var(--border-pink); font-size: 11px; flex-grow: 1;">Broadcast-Bild angehängt</span>
+                    <button type="button" onclick="clearAdminAttachedImage()" style="background: transparent; border: none; color: #ff0055; cursor: pointer; font-size: 14px;"><i class="fas fa-times"></i></button>
+                </div>
+
+                <!-- Video-Vorschau Bereich -->
+                <div id="admin-video-preview-box" style="display: none; align-items: center; gap: 10px; background: #080812; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-cyan);">
+                    <video id="admin-video-preview" src="" style="height: 50px; border-radius: 4px;" controls></video>
+                    <span style="color: var(--border-cyan); font-size: 11px; flex-grow: 1;">Broadcast-Video angehängt</span>
+                    <button type="button" onclick="clearAdminAttachedVideo()" style="background: transparent; border: none; color: #ff0055; cursor: pointer; font-size: 14px;"><i class="fas fa-times"></i></button>
+                </div>
+
+                <!-- Voice-Recording Status -->
+                <div id="admin-voice-status-bar" style="display: none; align-items: center; gap: 10px; font-size: 11px; color: var(--border-pink); background: rgba(255, 0, 127, 0.1); padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-pink);">
+                    <i class="fas fa-circle" style="color: #ff0055; animation: blink 1s infinite;"></i> <span id="admin-voice-timer">Broadcast Audio-Transmission läuft (0s)...</span>
+                    <button type="button" onclick="cancelAdminVoiceRecording()" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; margin-left: auto;">Abbrechen</button>
+                </div>
+
+                <!-- Action Controls (Bild, Video, Audio, Absenden) -->
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <label class="btn btn-neon-blue" style="font-size: 11px; padding: 8px 12px; cursor: pointer;" title="Bild anhängen">
+                        <i class="fas fa-image"></i> Bild
+                        <input type="file" id="admin-image-input" accept="image/*" onchange="previewAdminImage(event)" style="display: none;">
+                    </label>
+
+                    <label class="btn btn-neon-blue" style="font-size: 11px; padding: 8px 12px; cursor: pointer; border-color: var(--border-cyan); color: var(--border-cyan);" title="Video anhängen">
+                        <i class="fas fa-video"></i> Video
+                        <input type="file" id="admin-video-input" accept="video/*" onchange="previewAdminVideo(event)" style="display: none;">
+                    </label>
+
+                    <button type="button" id="admin-voice-record-btn" onclick="toggleAdminVoiceRecording()" class="btn btn-neon-pink" style="font-size: 11px; padding: 8px 12px;" title="Sprachnachricht aufnehmen">
+                        <i class="fas fa-microphone"></i> Audio
+                    </button>
+
+                    <button type="submit" class="btn btn-neon-green" style="margin-left: auto; font-size: 11px; padding: 8px 15px;">
+                        <i class="fas fa-paper-plane"></i> Absenden
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Benutzer-Verwaltung & Moderation (Erweiterte Operator-Datenbank) -->
+        <div class="admin-card">
+            <h3 style="color: var(--border-cyan); font-size: 15px; margin-bottom: 12px;"><i class="fas fa-users"></i> Erweiterte Operator-Datenbank</h3>
+            <div class="table-responsive-wrapper">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">Avatar</th>
+                            <th>Username</th>
+                            <th>Währung Matrix</th>
+                            <th style="text-align: right;">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-users-table">
+                        <tr><td colspan="4" style="text-align: center; color: #888;">Lade Cloud-Datenbank...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Foren-Moderation Tabelle -->
+        <div class="admin-card">
+            <h3 style="color: var(--border-pink); font-size: 15px; margin-bottom: 12px;"><i class="fas fa-comments"></i> Foren-Beiträge Moderation</h3>
+            <div class="table-responsive-wrapper">
+                <table class="admin-table" style="min-width: 500px;">
+                    <thead>
+                        <tr>
+                            <th style="width: 120px;">Autor</th>
+                            <th>Titel & Inhalt</th>
+                            <th style="text-align: right; width: 100px;">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-posts-table">
+                        <tr><td colspan="3" style="text-align: center; color: #888;">Lade Foren-Matrix...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Leaderboard Purge Zone -->
+        <div id="admin-leaderboard-purge-zone"></div>
+    </main>
+
+    <script src="js/app.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>

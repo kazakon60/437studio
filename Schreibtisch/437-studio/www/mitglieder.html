@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>437 Studio | Cyber Mitglieder-Matrix & Admin Panel</title>
+    <link rel="icon" type="image/png" href="/img/logo.png">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/maintenance.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --cyber-bg: #03030a;
+            --cyber-card-bg: rgba(10, 10, 22, 0.85);
+            --neon-blue: #00f0ff;
+            --neon-pink: #ff007f;
+            --neon-green: #00ff66;
+            --neon-gray: #4a4a5e;
+            --border-glow: 0 0 15px rgba(0, 240, 255, 0.15);
+            --pink-glow: 0 0 20px rgba(255, 0, 127, 0.25);
+        }
+
+        body {
+            background-color: var(--cyber-bg);
+            color: #fff;
+            font-family: monospace;
+            overflow-x: hidden;
+        }
+
+        .members-container {
+            max-width: 1200px;
+            margin: 110px auto 60px auto;
+            padding: 0 15px;
+            box-sizing: border-box;
+        }
+
+        .members-hero-banner {
+            background: linear-gradient(135deg, rgba(8, 8, 22, 0.95) 0%, rgba(22, 10, 45, 0.95) 100%);
+            border: 2px solid var(--neon-blue);
+            box-shadow: 0 0 30px rgba(0, 240, 255, 0.2);
+            border-radius: 14px;
+            padding: 25px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .members-hero-banner::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 4px; height: 100%;
+            background: linear-gradient(to bottom, var(--neon-blue), var(--neon-pink));
+        }
+
+        .filter-control-panel {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            width: 100%;
+        }
+
+        .filter-input, .filter-select {
+            background: rgba(4, 4, 12, 0.9);
+            border: 1px solid rgba(0, 240, 255, 0.4);
+            color: #fff;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            outline: none;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.1);
+            transition: all 0.3s ease;
+            flex-grow: 1;
+            min-width: 160px;
+        }
+
+        .filter-input:focus, .filter-select:focus {
+            border-color: var(--neon-pink);
+            box-shadow: 0 0 18px rgba(255, 0, 127, 0.3);
+        }
+
+        .matrix-stats-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 25px;
+            font-size: 11px;
+            color: #aaa;
+            flex-wrap: wrap;
+        }
+
+        .matrix-stats-item {
+            background: rgba(15, 15, 30, 0.7);
+            border: 1px solid rgba(0, 240, 255, 0.2);
+            padding: 8px 14px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .matrix-stats-item:hover {
+            border-color: var(--neon-blue);
+            color: #fff;
+        }
+
+        .matrix-section-title {
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin: 30px 0 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 8px;
+        }
+
+        .members-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+        }
+
+        @media (min-width: 650px) {
+            .members-grid {
+                grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+                gap: 20px;
+            }
+        }
+
+        .member-cyber-card {
+            background: var(--cyber-card-bg);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            border-radius: 12px;
+            padding: 20px 14px;
+            text-align: center;
+            position: relative;
+            backdrop-filter: blur(12px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: var(--border-glow);
+            box-sizing: border-box;
+        }
+
+        .member-cyber-card.admin-card {
+            border-color: rgba(255, 0, 127, 0.5);
+            box-shadow: var(--pink-glow);
+            background: linear-gradient(135deg, rgba(25, 10, 35, 0.85) 0%, rgba(10, 10, 22, 0.92) 100%);
+        }
+
+        .member-avatar-wrapper {
+            position: relative;
+            margin-bottom: 14px;
+        }
+
+        .member-avatar {
+            width: 75px;
+            height: 75px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--neon-blue);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+            background: #000;
+        }
+
+        @media (min-width: 650px) {
+            .member-avatar { width: 90px; height: 90px; }
+            .member-cyber-card { padding: 24px 18px; }
+        }
+
+        .member-cyber-card.admin-card .member-avatar {
+            border-color: var(--neon-pink);
+            box-shadow: 0 0 18px rgba(255, 0, 127, 0.4);
+        }
+
+        .status-dot {
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid #03030a;
+        }
+        .status-dot.online {
+            background: var(--neon-green);
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+        .status-dot.offline {
+            background: var(--neon-gray);
+        }
+
+        .member-username {
+            font-weight: bold;
+            font-size: 13px;
+            color: #fff;
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            justify-content: center;
+            word-break: break-all;
+            width: 100%;
+        }
+
+        @media (min-width: 650px) {
+            .member-username { font-size: 15px; flex-direction: row; gap: 8px; }
+        }
+
+        .role-badge-cyber {
+            font-size: 8.5px;
+            padding: 3px 7px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+
+        .badge-admin-cyber { 
+            background: rgba(255, 0, 127, 0.15); 
+            color: var(--neon-pink); 
+            border: 1px solid var(--neon-pink); 
+            box-shadow: 0 0 8px rgba(255,0,127,0.3); 
+        }
+
+        .badge-user-cyber { 
+            background: rgba(0, 240, 255, 0.1); 
+            color: var(--neon-blue); 
+            border: 1px solid var(--neon-blue); 
+        }
+
+        .member-actions {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .admin-panel-box {
+            width: 100%;
+            margin-top: 12px;
+            padding-top: 10px;
+            border-top: 1px dashed rgba(255, 0, 127, 0.4);
+            display: flex;
+            gap: 6px;
+        }
+
+        .admin-action-btn {
+            flex: 1;
+            padding: 5px;
+            font-size: 9.5px;
+            font-family: monospace;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .btn-toggle-admin {
+            background: rgba(255, 170, 0, 0.1);
+            color: #ffaa00;
+            border-color: #ffaa00;
+        }
+        .btn-toggle-admin:hover {
+            background: #ffaa00;
+            color: #000;
+        }
+
+        .btn-delete-user {
+            background: rgba(255, 0, 85, 0.1);
+            color: #ff0055;
+            border-color: #ff0055;
+        }
+        .btn-delete-user:hover {
+            background: #ff0055;
+            color: #fff;
+        }
+
+        .cyber-btn {
+            flex: 1;
+            padding: 8px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 10.5px;
+            font-weight: bold;
+            font-family: monospace;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            transition: all 0.2s ease;
+            border: none;
+        }
+
+        .btn-profile-view {
+            background: rgba(0, 240, 255, 0.1);
+            color: var(--neon-blue);
+            border: 1px solid var(--neon-blue);
+        }
+        .btn-profile-view:hover {
+            background: var(--neon-blue);
+            color: #000;
+        }
+
+        .btn-msg-send {
+            background: rgba(255, 0, 127, 0.1);
+            color: var(--neon-pink);
+            border: 1px solid var(--neon-pink);
+        }
+        .btn-msg-send:hover {
+            background: var(--neon-pink);
+            color: #fff;
+        }
+
+        /* CUSTOM CYBER MODAL / DESIGN-FENSTER */
+        .cyber-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(3, 3, 10, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999999;
+            backdrop-filter: blur(8px);
+            animation: fadeInModal 0.25s ease;
+        }
+        .cyber-modal-overlay.hidden {
+            display: none !important;
+        }
+        @keyframes fadeInModal {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .cyber-modal-box {
+            background: linear-gradient(135deg, #0c0c18 0%, #160a2a 100%);
+            border: 2px solid var(--neon-blue);
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(0, 240, 255, 0.35), inset 0 0 15px rgba(0, 240, 255, 0.1);
+            font-family: monospace;
+            position: relative;
+        }
+        .cyber-modal-box.danger {
+            border-color: var(--neon-pink);
+            box-shadow: 0 0 40px rgba(255, 0, 127, 0.35), inset 0 0 15px rgba(255, 0, 127, 0.1);
+        }
+        .cyber-modal-box.success {
+            border-color: var(--neon-green);
+            box-shadow: 0 0 40px rgba(0, 255, 102, 0.35), inset 0 0 15px rgba(0, 255, 102, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="grid-overlay"></div>
+
+    <!-- CUSTOM DESIGN CYBER MODAL (ERSETZT BROWSER ALERT / CONFIRM) -->
+    <div id="cyber-custom-modal" class="cyber-modal-overlay hidden">
+        <div id="cyber-modal-box-inner" class="cyber-modal-box">
+            <div id="cyber-modal-icon" style="font-size: 42px; color: var(--neon-blue); margin-bottom: 12px; text-shadow: 0 0 15px rgba(0,240,255,0.6);">
+                <i class="fas fa-satellite-dish"></i>
+            </div>
+            <h2 id="cyber-modal-title" style="color: var(--neon-blue); font-size: 16px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">System Meldung</h2>
+            <p id="cyber-modal-text" style="color: #ccc; font-size: 12px; line-height: 1.5; margin-bottom: 20px;">
+                Nachrichtentext...
+            </p>
+            <div id="cyber-modal-actions" style="display: flex; gap: 10px;">
+                <!-- Dynamische Buttons werden hier eingefügt -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="logo">437<span>Studio</span></div>
+        <div class="menu-toggle"><i class="fas fa-bars"></i></div>
+        <ul class="nav-links">
+            <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
+            <li><a href="forum.html"><i class="fas fa-comments"></i> Forum</a></li>
+            <li><a href="games.html"><i class="fas fa-gamepad"></i> Games</a></li>
+            <li><a href="mitglieder.html" class="active"><i class="fas fa-users"></i> Mitglieder</a></li>
+            <li><a href="music.html"><i class="fas fa-music"></i> Musik</a></li>
+            <li><a href="discord.html"><i class="fab fa-discord"></i> Discord</a></li>
+
+            <li class="auth-container">
+                <div id="logged-out-zone">
+                    <button class="btn btn-neon-blue" onclick="redirectToLogin()">Login / Register</button>
+                </div>
+                <div id="logged-in-zone" class="hidden user-trigger" onclick="toggleProfileDropdown()">
+                    <img id="nav-avatar" src="" alt="Avatar">
+                    <span id="nav-username">User</span> 
+                    <span id="admin-badge" class="hidden" style="color:#ff007f; font-size:10px; border:1px solid #ff007f; padding:2px 4px; border-radius:4px; margin-left:5px;">ADMIN</span>
+                    <span id="dropdown-msg-badge" class="hidden"></span>
+                    <div id="profile-dropdown" class="dropdown-menu hidden"></div>
+                </div>
+            </li>
+        </ul>
+    </nav>
+    <div id="ticker-insertion-point"></div>
+
+    <!-- Mitglieder Hauptbereich -->
+    <main class="members-container">
+        <div class="members-hero-banner" style="flex-direction: column; align-items: stretch;">
+            <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <h1 class="neon-text-blue" style="font-size: 22px; text-transform: uppercase; margin-bottom: 4px;"><i class="fas fa-users"></i> Mitglieder-Matrix & Admin Panel</h1>
+                    <p style="color: #888; font-size: 11px; margin: 0;">Netzwerk-Übersicht & administrative Kontrolltools.</p>
+                </div>
+                <div id="admin-status-indicator" class="hidden" style="background: rgba(255,0,127,0.15); border: 1px solid var(--neon-pink); padding: 5px 12px; border-radius: 6px; font-size: 11px; color: var(--neon-pink);">
+                    <i class="fas fa-shield-alt"></i> Admin-Modus Aktiv
+                </div>
+            </div>
+            
+            <!-- Filter Kontrollzentrum -->
+            <div class="filter-control-panel">
+                <input type="text" id="memberSearchInput" class="filter-input" placeholder="🔍 Operator suchen...">
+                <select id="filterStatusSelect" class="filter-select" onchange="filterAndRenderMembers()">
+                    <option value="all">Alle Status</option>
+                    <option value="online">🟢 Nur Online</option>
+                    <option value="offline">⚪ Nur Offline</option>
+                </select>
+                <select id="filterRoleSelect" class="filter-select" onchange="filterAndRenderMembers()">
+                    <option value="all">Alle Rollen</option>
+                    <option value="admin">🛡️ Nur Admins</option>
+                    <option value="operator">💻 Nur Operatoren</option>
+                </select>
+                <select id="memberSortSelect" class="filter-select" onchange="filterAndRenderMembers()">
+                    <option value="name_asc">A - Z</option>
+                    <option value="name_desc">Z - A</option>
+                    <option value="role_admin">Admins zuerst</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Live Statistik Leiste -->
+        <div id="matrixStatsBar" class="matrix-stats-bar">
+            <div class="matrix-stats-item" onclick="quickFilter('all')"><i class="fas fa-database" style="color: var(--neon-blue);"></i> Gesamt: <span id="stat-total" style="color:#fff; font-weight:bold;">0</span></div>
+            <div class="matrix-stats-item" onclick="quickFilter('online')"><i class="fas fa-circle" style="color: var(--neon-green); font-size: 8px;"></i> Online: <span id="stat-online" style="color:#fff; font-weight:bold;">0</span></div>
+            <div class="matrix-stats-item" onclick="quickFilter('admin')"><i class="fas fa-shield-alt" style="color: var(--neon-pink);"></i> Admins: <span id="stat-admins" style="color:#fff; font-weight:bold;">0</span></div>
+        </div>
+
+        <!-- Matrix Inhaltsbereich -->
+        <div id="matrix-content-wrapper">
+            <div style="text-align: center; color: var(--neon-blue); padding: 50px;">
+                <i class="fas fa-spinner fa-spin fa-2x"></i>
+                <div style="margin-top: 12px; font-size: 13px;">Lade Mitglieder-Matrix...</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Globale Core Engine Skripte -->
+    <script src="js/app.js"></script>
+    <script>
+        let allMembersData = [];
+
+        // --- SCHÖNE DESIGN-MODALS (ERSETZEN BROWSER ALERT / CONFIRM) ---
+        function showCyberAlert(title, text, type = "info") {
+            const modal = document.getElementById("cyber-custom-modal");
+            const boxInner = document.getElementById("cyber-modal-box-inner");
+            const iconEl = document.getElementById("cyber-modal-icon");
+            const titleEl = document.getElementById("cyber-modal-title");
+            const textEl = document.getElementById("cyber-modal-text");
+            const actionsEl = document.getElementById("cyber-modal-actions");
+
+            boxInner.className = `cyber-modal-box ${type}`;
+            titleEl.textContent = title;
+            textEl.textContent = text;
+
+            if (type === "danger") {
+                iconEl.className = "fas fa-exclamation-triangle";
+                iconEl.style.color = "var(--neon-pink)";
+                iconEl.style.textShadow = "0 0 15px rgba(255,0,127,0.6)";
+                titleEl.style.color = "var(--neon-pink)";
+            } else if (type === "success") {
+                iconEl.className = "fas fa-check-circle";
+                iconEl.style.color = "var(--neon-green)";
+                iconEl.style.textShadow = "0 0 15px rgba(0,255,102,0.6)";
+                titleEl.style.color = "var(--neon-green)";
+            } else {
+                iconEl.className = "fas fa-satellite-dish";
+                iconEl.style.color = "var(--neon-blue)";
+                iconEl.style.textShadow = "0 0 15px rgba(0,240,255,0.6)";
+                titleEl.style.color = "var(--neon-blue)";
+            }
+
+            actionsEl.innerHTML = `
+                <button onclick="closeCyberModal()" class="btn btn-neon-blue" style="width: 100%; padding: 10px; font-size: 12px; cursor: pointer; font-weight: bold;">
+                    <i class="fas fa-check"></i> Bestätigen
+                </button>
+            `;
+
+            modal.classList.remove("hidden");
+        }
+
+        function showCyberConfirm(title, text, onConfirmCallback) {
+            const modal = document.getElementById("cyber-custom-modal");
+            const boxInner = document.getElementById("cyber-modal-box-inner");
+            const iconEl = document.getElementById("cyber-modal-icon");
+            const titleEl = document.getElementById("cyber-modal-title");
+            const textEl = document.getElementById("cyber-modal-text");
+            const actionsEl = document.getElementById("cyber-modal-actions");
+
+            boxInner.className = "cyber-modal-box danger";
+            iconEl.className = "fas fa-shield-alt";
+            iconEl.style.color = "var(--neon-pink)";
+            iconEl.style.textShadow = "0 0 15px rgba(255,0,127,0.6)";
+            titleEl.textContent = title;
+            titleEl.style.color = "var(--neon-pink)";
+            textEl.textContent = text;
+
+            actionsEl.innerHTML = `
+                <button onclick="closeCyberModal()" class="btn" style="flex: 1; padding: 10px; font-size: 11px; background: rgba(255,255,255,0.05); border: 1px solid #555; color: #aaa; cursor: pointer;">
+                    Abbrechen
+                </button>
+                <button id="cyber-confirm-yes-btn" class="btn" style="flex: 1; padding: 10px; font-size: 11px; background: rgba(255,0,127,0.2); border: 1px solid var(--neon-pink); color: var(--neon-pink); cursor: pointer; font-weight: bold;">
+                    Ausführen
+                </button>
+            `;
+
+            modal.classList.remove("hidden");
+
+            document.getElementById("cyber-confirm-yes-btn").onclick = () => {
+                closeCyberModal();
+                if (typeof onConfirmCallback === "function") {
+                    onConfirmCallback();
+                }
+            };
+        }
+
+        function closeCyberModal() {
+            document.getElementById("cyber-custom-modal").classList.add("hidden");
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            loadAllMembers();
+
+            const searchInput = document.getElementById("memberSearchInput");
+            if (searchInput) {
+                searchInput.addEventListener("input", () => {
+                    filterAndRenderMembers();
+                });
+            }
+        });
+
+        async function loadAllMembers() {
+            let retries = 0;
+            while (!window.supabaseClient && retries < 25) {
+                await new Promise(r => setTimeout(r, 100));
+                retries++;
+            }
+
+            const client = window.supabaseClient || supabaseClient;
+            if (!client) return;
+
+            if (currentUser && currentUser.username) {
+                if (typeof isAdmin === "function" && isAdmin(currentUser)) {
+                    const indicator = document.getElementById("admin-status-indicator");
+                    if (indicator) indicator.classList.remove("hidden");
+                }
+            }
+
+            const { data, error } = await client
+                .from("users")
+                .select("username, avatar, is_admin, last_active_at")
+                .order("username", { ascending: true });
+
+            if (error) {
+                console.error("Fehler beim Laden:", error);
+                return;
+            }
+
+            allMembersData = data || [];
+            updateStatsCounters(allMembersData);
+            filterAndRenderMembers();
+        }
+
+        function isUserOnline(lastActiveAt, username) {
+            if (currentUser && currentUser.username && username.toLowerCase() === currentUser.username.toLowerCase()) {
+                return true;
+            }
+            if (!lastActiveAt) return false;
+            const lastActiveDate = new Date(lastActiveAt);
+            const now = new Date();
+            const diffMinutes = (now - lastActiveDate) / 60000;
+            return diffMinutes >= 0 && diffMinutes <= 5;
+        }
+
+        function updateStatsCounters(members) {
+            const total = members.length;
+            const onlineCount = members.filter(m => isUserOnline(m.last_active_at, m.username)).length;
+            const admins = members.filter(m => isAdmin(m)).length;
+
+            document.getElementById("stat-total").textContent = total;
+            document.getElementById("stat-online").textContent = onlineCount;
+            document.getElementById("stat-admins").textContent = admins;
+        }
+
+        function quickFilter(type) {
+            const statusSelect = document.getElementById("filterStatusSelect");
+            const roleSelect = document.getElementById("filterRoleSelect");
+
+            if (type === 'online') {
+                if (statusSelect) statusSelect.value = 'online';
+                if (roleSelect) roleSelect.value = 'all';
+            } else if (type === 'admin') {
+                if (statusSelect) statusSelect.value = 'all';
+                if (roleSelect) roleSelect.value = 'admin';
+            } else {
+                if (statusSelect) statusSelect.value = 'all';
+                if (roleSelect) roleSelect.value = 'all';
+            }
+            filterAndRenderMembers();
+        }
+
+        function filterAndRenderMembers() {
+            const searchInput = document.getElementById("memberSearchInput");
+            const statusSelect = document.getElementById("filterStatusSelect");
+            const roleSelect = document.getElementById("filterRoleSelect");
+            const sortSelect = document.getElementById("memberSortSelect");
+            
+            const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
+            const statusFilter = statusSelect ? statusSelect.value : "all";
+            const roleFilter = roleSelect ? roleSelect.value : "all";
+            const sortMode = sortSelect ? sortSelect.value : "name_asc";
+
+            let filtered = allMembersData.filter(m => {
+                const matchesSearch = m.username.toLowerCase().includes(query);
+                const online = isUserOnline(m.last_active_at, m.username);
+                const admin = isAdmin(m);
+
+                if (statusFilter === "online" && !online) return false;
+                if (statusFilter === "offline" && online) return false;
+                if (roleFilter === "admin" && !admin) return false;
+                if (roleFilter === "operator" && admin) return false;
+
+                return matchesSearch;
+            });
+
+            filtered.sort((a, b) => {
+                if (sortMode === "name_desc") {
+                    return b.username.localeCompare(a.username);
+                } else if (sortMode === "role_admin") {
+                    const aAdmin = isAdmin(a) ? 0 : 1;
+                    const bAdmin = isAdmin(b) ? 0 : 1;
+                    if (aAdmin !== bAdmin) return aAdmin - bAdmin;
+                    return a.username.localeCompare(b.username);
+                } else {
+                    return a.username.localeCompare(b.username);
+                }
+            });
+
+            renderSplitMembersGrid(filtered);
+        }
+
+        function renderSplitMembersGrid(members) {
+            const wrapper = document.getElementById("matrix-content-wrapper");
+            if (!wrapper) return;
+
+            wrapper.innerHTML = "";
+
+            if (members.length === 0) {
+                wrapper.innerHTML = `<div style="color: #888; text-align: center; padding: 40px;">Keine passenden Operator gefunden.</div>`;
+                return;
+            }
+
+            const admins = members.filter(m => isAdmin(m));
+            const regularUsers = members.filter(m => !isAdmin(m));
+
+            if (admins.length > 0) {
+                const adminTitle = document.createElement("div");
+                adminTitle.className = "matrix-section-title";
+                adminTitle.style.color = "var(--neon-pink)";
+                adminTitle.innerHTML = `<i class="fas fa-shield-alt"></i> Root-Administration (${admins.length})`;
+                wrapper.appendChild(adminTitle);
+
+                const adminGrid = document.createElement("div");
+                adminGrid.className = "members-grid";
+                admins.forEach(member => adminGrid.appendChild(createMemberCard(member, true)));
+                wrapper.appendChild(adminGrid);
+            }
+
+            if (regularUsers.length > 0) {
+                const userTitle = document.createElement("div");
+                userTitle.className = "matrix-section-title";
+                userTitle.style.color = "var(--neon-blue)";
+                userTitle.innerHTML = `<i class="fas fa-user-astronaut"></i> Operator (${regularUsers.length})`;
+                wrapper.appendChild(userTitle);
+
+                const userGrid = document.createElement("div");
+                userGrid.className = "members-grid";
+                regularUsers.forEach(member => userGrid.appendChild(createMemberCard(member, false)));
+                wrapper.appendChild(userGrid);
+            }
+        }
+
+        function createMemberCard(member, isUserAdmin) {
+            const avatar = getSafeAvatar(member.avatar);
+            const online = isUserOnline(member.last_active_at, member.username);
+            const card = document.createElement("div");
+            card.className = `member-cyber-card ${isUserAdmin ? 'admin-card' : ''}`;
+            
+            const viewerIsAdmin = currentUser && typeof isAdmin === "function" && isAdmin(currentUser);
+            const isSelf = currentUser && currentUser.username.toLowerCase() === member.username.toLowerCase();
+
+            let adminPanelHtml = "";
+            if (viewerIsAdmin) {
+                adminPanelHtml = `
+                    <div class="admin-panel-box">
+                        <button onclick="adminToggleRole('${escapeHTML(member.username)}', ${isUserAdmin})" class="admin-action-btn btn-toggle-admin" title="Rolle umschalten">
+                            <i class="fas fa-user-shield"></i> ${isUserAdmin ? 'Degradieren' : 'Admin machen'}
+                        </button>
+                        ${!isSelf ? `
+                            <button onclick="adminDeleteUser('${escapeHTML(member.username)}')" class="admin-action-btn btn-delete-user" title="Account löschen">
+                                <i class="fas fa-trash-alt"></i> Löschen
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            
+            card.innerHTML = `
+                <div class="member-avatar-wrapper">
+                    <img src="${escapeHTML(avatar)}" class="member-avatar" alt="${escapeHTML(member.username)}">
+                    <div class="status-dot ${online ? 'online' : 'offline'}" title="${online ? 'Online' : 'Offline'}"></div>
+                </div>
+                <div class="member-username">
+                    <span>${escapeHTML(member.username)}</span>
+                    <span class="role-badge-cyber ${isUserAdmin ? 'badge-admin-cyber' : 'badge-user-cyber'}">
+                        ${isUserAdmin ? 'ROOT // ADMIN' : 'OPERATOR'}
+                    </span>
+                </div>
+                <div class="member-actions">
+                    <a href="profile.html?user=${encodeURIComponent(member.username)}" 
+                       onclick="sessionStorage.setItem('437_view_profile', '${escapeHTML(member.username)}')" 
+                       class="cyber-btn btn-profile-view">
+                        <i class="fas fa-id-card"></i> Profil
+                    </a>
+                    <a href="messages.html?to=${encodeURIComponent(member.username)}" 
+                       onclick="sessionStorage.setItem('437_chat_partner', '${escapeHTML(member.username)}')" 
+                       class="cyber-btn btn-msg-send">
+                        <i class="fas fa-envelope"></i> Chat
+                    </a>
+                </div>
+                ${adminPanelHtml}
+            `;
+            return card;
+        }
+
+        function adminToggleRole(username, currentIsAdmin) {
+            const newAdminStatus = !currentIsAdmin;
+            const actionText = newAdminStatus ? "zum Administrator befördern" : "die Admin-Rechte entziehen";
+
+            showCyberConfirm(
+                "Rolle ändern",
+                `Möchtest du '${username}' wirklich ${actionText}?`,
+                async () => {
+                    if (!supabaseClient) return;
+
+                    const { error } = await supabaseClient
+                        .from("users")
+                        .update({ is_admin: newAdminStatus })
+                        .ilike("username", username);
+
+                    if (error) {
+                        showCyberAlert("Fehler", "❌ Fehler: " + error.message, "danger");
+                        return;
+                    }
+
+                    showCyberAlert("Erfolg", `✅ Benutzer '${username}' wurde erfolgreich aktualisiert.`, "success");
+                    loadAllMembers();
+                }
+            );
+        }
+
+        function adminDeleteUser(username) {
+            showCyberConfirm(
+                "Account löschen",
+                `🚨 ACHTUNG: Möchtest du den Operator '${username}' unwiderruflich aus der Datenbank löschen?`,
+                async () => {
+                    if (!supabaseClient) return;
+
+                    const { error } = await supabaseClient
+                        .from("users")
+                        .delete()
+                        .ilike("username", username);
+
+                    if (error) {
+                        showCyberAlert("Fehler", "❌ Fehler beim Löschen: " + error.message, "danger");
+                        return;
+                    }
+
+                    showCyberAlert("Erfolg", `🗑️ Operator '${username}' wurde erfolgreich aus der Matrix gelöscht.`, "success");
+                    loadAllMembers();
+                }
+            );
+        }
+    </script>
+</body>
+</html>

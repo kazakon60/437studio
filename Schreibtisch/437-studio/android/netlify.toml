@@ -1,0 +1,3 @@
+[build]
+  publish = "www"
+  command = "" # falls kein Build-Befehl nötig ist, leer lassen oder anpassen
