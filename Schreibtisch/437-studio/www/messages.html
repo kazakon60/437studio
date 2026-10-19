@@ -4,11 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <title>437 Studio | Verschlüsselte Nachrichten Matrix</title>
+    <title>437 Studio | Nachrichten Matrix</title>
     <link rel="icon" type="image/png" href="/img/logo.png">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/maintenance.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Performance optimizations -->
+    <link rel="preload" href="js/messages.min.js" as="script">
+    <link rel="prefetch" href="js/app.min.js">
+    
+    <!-- Performance monitoring -->
+    <script src="js/performance-monitor.js"></script>
+    
+    <!-- Critical CSS inline for above-the-fold content -->
     <style>
         :root {
             --neon-blue: #00f0ff;
@@ -16,7 +25,6 @@
             --neon-green: #00ff66;
             --bg-deep: #05050b;
             --bg-panel: #0a0a16;
-            --bg-hover: #121226;
             --border-cyber: rgba(0, 240, 255, 0.2);
         }
 
@@ -25,6 +33,9 @@
             color: #e2e8f0;
             font-family: 'Courier New', Courier, monospace;
             overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            margin: 0;
+            padding: 0;
         }
 
         .cyber-comms-wrapper {
@@ -44,6 +55,8 @@
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 0 25px rgba(0, 240, 255, 0.05);
+            flex-wrap: wrap;
+            gap: 12px;
         }
 
         .cyber-comms-grid {
@@ -54,7 +67,7 @@
             min-height: 620px;
         }
 
-        /* Sidebar / Linke Spalte */
+        /* Simplified sidebar */
         .cyber-sidebar {
             background: var(--bg-panel);
             border: 1px solid var(--border-cyber);
@@ -83,7 +96,8 @@
             cursor: pointer;
             border-radius: 6px;
             text-transform: uppercase;
-            transition: all 0.25s ease;
+            transition: all 0.15s ease;
+            will-change: transform;
         }
 
         .sidebar-tab-btn.active {
@@ -108,7 +122,7 @@
             font-family: monospace;
             font-size: 12px;
             box-sizing: border-box;
-            transition: border-color 0.2s;
+            transition: border-color 0.15s;
         }
 
         .user-search-wrapper input:focus {
@@ -133,21 +147,6 @@
 
         .user-suggestions.hidden { display: none; }
 
-        .suggestion-item {
-            padding: 9px 12px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-            border-bottom: 1px solid #141428;
-            transition: background 0.2s;
-        }
-
-        .suggestion-item:hover {
-            background: rgba(0, 240, 255, 0.15);
-            color: var(--neon-blue);
-        }
-
         .scrollable-list {
             flex-grow: 1;
             overflow-y: auto;
@@ -157,7 +156,7 @@
             padding-right: 4px;
         }
 
-        /* Chat Hauptfenster / Rechte Spalte */
+        /* Simplified chat pane */
         .cyber-chat-pane {
             background: var(--bg-panel);
             border: 1px solid var(--border-cyber);
@@ -175,6 +174,8 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .chat-bubbles {
@@ -188,9 +189,9 @@
             flex-direction: column;
             gap: 12px;
             margin-bottom: 14px;
-            transition: background 0.3s ease;
         }
 
+        /* Performance optimized bubble animations */
         .bubble {
             max-width: 100%;
             padding: 8px 12px;
@@ -200,12 +201,18 @@
             word-break: break-word;
             position: relative;
             padding-top: 18px !important;
-            animation: fadeInBubble 0.2s ease-out;
+            will-change: opacity, transform;
         }
 
-        @keyframes fadeInBubble {
-            from { opacity: 0; transform: translateY(6px); }
+        /* Critical animations for performance */
+        @keyframes fadeInOptimized {
+            from { opacity: 0; transform: translateY(4px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+
+        .bubble-optimized {
+            animation: fadeInOptimized 0.1s ease-out;
+            will-change: opacity, transform;
         }
 
         .bubble.sent {
@@ -232,14 +239,14 @@
             font-size: 10px;
             padding: 2px 4px;
             z-index: 5;
-            transition: color 0.2s;
+            transition: color 0.15s;
         }
 
         .bubble-delete-btn:hover {
             color: #ff0055;
         }
 
-        /* Vorschau & Eingabe */
+        /* Optimized preview pane */
         .preview-pane {
             display: none;
             align-items: center;
@@ -250,16 +257,21 @@
             border: 1px solid var(--neon-blue);
             margin-bottom: 8px;
             font-size: 11px;
+            flex-wrap: wrap;
         }
 
+        /* Optimized input row */
         .input-control-row {
             display: flex;
-            gap: 8px;
+            gap: 10px;
             align-items: center;
+            flex-wrap: wrap;
+            margin-top: auto;
         }
 
         .input-control-row input[type="text"] {
-            flex-grow: 1;
+            flex: 1 1 200px;
+            min-width: 0;
             background: #04040a;
             border: 1px solid #22223a;
             color: #fff;
@@ -267,7 +279,7 @@
             border-radius: 6px;
             font-family: monospace;
             font-size: 12px;
-            transition: border-color 0.2s;
+            transition: border-color 0.15s;
         }
 
         .input-control-row input[type="text"]:focus {
@@ -276,6 +288,7 @@
             box-shadow: 0 0 8px rgba(0, 240, 255, 0.2);
         }
 
+        /* Simplified tool buttons */
         .tool-action-btn {
             background: #0d0d1c;
             border: 1px solid #22223a;
@@ -284,7 +297,11 @@
             border-radius: 6px;
             cursor: pointer;
             font-size: 13px;
-            transition: all 0.2s;
+            transition: all 0.15s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            will-change: background, color, border-color;
         }
 
         .tool-action-btn:hover {
@@ -293,26 +310,115 @@
             background: rgba(0, 240, 255, 0.08);
         }
 
+        /* Simplified sender badges */
+        .sender-badge-tag {
+            font-size: 9px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .sender-badge-system {
+            background: rgba(255, 0, 127, 0.2);
+            color: #ff007f;
+            border: 1px solid #ff007f;
+        }
+        .sender-badge-operator {
+            background: rgba(0, 240, 255, 0.15);
+            color: #00f0ff;
+            border: 1px solid #00f0ff;
+        }
+
+        /* Optimized image zoom modal */
+        #cyber-image-zoom-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(3, 3, 10, 0.92);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 999999;
+            backdrop-filter: blur(10px);
+            animation: fadeInModalOptimized 0.15s ease;
+        }
+        @keyframes fadeInModalOptimized {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* Mobile responsive optimizations */
         @media (max-width: 850px) {
+            .cyber-comms-wrapper {
+                margin-top: 80px;
+            }
             .cyber-comms-grid {
                 grid-template-columns: 1fr;
                 height: auto;
             }
-            .cyber-sidebar { height: 320px; }
-            .cyber-chat-pane { height: 520px; }
+            .cyber-sidebar { height: 300px; }
+            .cyber-chat-pane { height: 550px; }
+            
+            .input-control-row {
+                gap: 6px;
+            }
+            .input-control-row input[type="text"] {
+                flex: 1 1 100%;
+                order: 1;
+            }
+            .tool-action-btn, .input-control-row button[type="submit"] {
+                flex: 1;
+                order: 2;
+                padding: 10px;
+            }
+        }
+
+        /* Performance optimization classes */
+        .gpu-accelerated {
+            transform: translateZ(0);
+            will-change: transform;
+        }
+        
+        .no-transitions {
+            transition: none !important;
+        }
+        
+        .reduce-animations {
+            animation-duration: 0.05s !important;
+            transition-duration: 0.05s !important;
+        }
+        
+        .hide-scrollbar {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+        
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
         }
     </style>
 </head>
 <body>
     <div class="grid-overlay"></div>
 
-    <!-- Navigation Bar -->
+    <!-- Optimized image zoom modal -->
+    <div id="cyber-image-zoom-modal" class="gpu-accelerated" onclick="closeImageZoomModal()">
+        <div style="position: relative; max-width: 90vw; max-height: 90vh; text-align: center;">
+            <span onclick="closeImageZoomModal()" style="position: absolute; top: -35px; right: 0; font-size: 28px; color: var(--neon-blue); cursor: pointer; font-weight: bold;">&times;</span>
+            <img id="zoom-modal-img" src="" style="max-width: 90vw; max-height: 85vh; border: 2px solid var(--neon-blue); border-radius: 8px; box-shadow: 0 0 30px rgba(0,240,255,0.4); object-fit: contain;">
+        </div>
+    </div>
+
+    <!-- Simplified navigation -->
     <nav class="navbar">
         <div class="logo">437<span>Studio</span></div>
-        <div class="menu-toggle"><i class="fas fa-bars"></i></div>
+        <div class="menu-toggle" aria-label="Toggle navigation"><i class="fas fa-bars"></i></div>
         <ul class="nav-links">
             <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
             <li><a href="forum.html"><i class="fas fa-comments"></i> Forum</a></li>
+            <li><a href="messages.html" class="active"><i class="fas fa-envelope"></i> Nachrichten</a></li>
             <li><a href="games.html"><i class="fas fa-gamepad"></i> Games</a></li>
             <li><a href="mitglieder.html"><i class="fas fa-users"></i> Mitglieder</a></li>  
             <li><a href="music.html"><i class="fas fa-music"></i> Musik</a></li>
@@ -322,9 +428,9 @@
                     <button class="btn btn-neon-blue" onclick="redirectToLogin()">Login / Register</button>
                 </div>
                 <div id="logged-in-zone" class="hidden user-trigger" onclick="toggleProfileDropdown()">
-                    <img id="nav-avatar" src="" alt="Avatar">
+                    <img id="nav-avatar" src="" alt="Avatar" loading="lazy">
                     <span id="nav-username">User</span> 
-                    <span id="admin-badge" class="hidden" style="color:#ff007f; font-size:10px; border:1px solid #ff007f; padding:2px 4px; border-radius:4px; margin-left:5px;">ADMIN</span>
+                    <span id="admin-badge" class="hidden">ADMIN</span>
                     <span id="dropdown-msg-badge" class="hidden"></span>
                     <div id="profile-dropdown" class="dropdown-menu hidden"></div>
                 </div>
@@ -337,96 +443,87 @@
     <main class="cyber-comms-wrapper">
         <div class="cyber-title-card">
             <div>
-                <h1 class="neon-text-blue" style="font-size: 20px; margin: 0; text-transform: uppercase;"><i class="fas fa-envelope-open-text"></i> Verschlüsselte Nachrichten Matrix</h1>
+                <h1 class="neon-text-blue"><i class="fas fa-envelope-open-text"></i> Nachrichten Matrix</h1>
                 <p style="color: #777; font-size: 11px; margin: 4px 0 0 0;">Sichere Direktverbindung und verschlüsselte Gruppen-Channels zwischen Operatoren.</p>
             </div>
-            <button onclick="openCreateChannelModal()" class="btn btn-neon-blue" style="font-size: 11px; padding: 7px 14px; cursor: pointer;">
+            <button onclick="openCreateChannelModal()" class="btn btn-neon-blue">
                 <i class="fas fa-plus"></i> Channel erstellen
             </button>
         </div>
 
         <div class="cyber-comms-grid">
-            <!-- Linke Spalte: Sidebar & Navigation -->
-            <div class="cyber-sidebar">
+            <!-- Simplified sidebar -->
+            <div class="cyber-sidebar gpu-accelerated">
                 <div class="sidebar-tabs">
                     <button onclick="switchMessageTab('private')" id="tab-private-btn" class="sidebar-tab-btn active">Direktchat</button>
                     <button onclick="switchMessageTab('channels')" id="tab-channels-btn" class="sidebar-tab-btn">Channels</button>
                 </div>
 
                 <div class="user-search-wrapper">
-                    <input type="text" id="recipient-search-input" autocomplete="off" placeholder="Operator suchen..." oninput="handleUserSearchInput(event)">
+                    <input type="text" id="recipient-search-input" autocomplete="off" placeholder="Operator suchen..." oninput="handleUserSearchInput(event)" loading="lazy">
                     <div id="user-suggestions-box" class="user-suggestions hidden"></div>
                 </div>
 
-                <div id="recent-chats-list" class="scrollable-list"></div>
-                <div id="channels-list-container" class="scrollable-list hidden"></div>
+                <div id="recent-chats-list" class="scrollable-list hide-scrollbar"></div>
+                <div id="channels-list-container" class="scrollable-list hidden hide-scrollbar"></div>
             </div>
 
-            <!-- Rechte Spalte: Chatverlauf & Eingabe -->
+            <!-- Simplified chat pane -->
             <div class="cyber-chat-pane">
                 <div id="active-chat-header" class="chat-top-header">
-                    <span style="color: var(--neon-blue); font-weight: bold; font-size: 13px;">
+                    <span>
                         <i class="fas fa-satellite-dish"></i> Wähle einen Operator oder Channel
                     </span>
                 </div>
 
-                <div id="chat-bubbles-container" class="chat-bubbles">
+                <div id="chat-bubbles-container" class="chat-bubbles gpu-accelerated hide-scrollbar">
                     <div style="text-align: center; color: #555; margin: auto; font-size: 12px;">Kein Chat ausgewählt.</div>
                 </div>
 
-                <!-- NUR-LESEN SCHREIBSPERRE FÜR CHANNELS -->
-                <div id="channel-locked-banner" style="display: none; align-items: center; justify-content: center; gap: 10px; background: rgba(255, 0, 127, 0.08); border: 1px dashed rgba(255, 0, 127, 0.5); padding: 12px; border-radius: 6px; color: #ff007f; font-size: 12px; font-family: monospace; text-transform: uppercase; margin-top: auto;">
+                <!-- Simplified channel lock banner -->
+                <div id="channel-locked-banner" class="hidden">
                     <i class="fas fa-lock"></i> <span>Channel-Schreibschutz aktiv – Nur Administratoren können hier schreiben.</span>
                 </div>
 
-                <!-- RIESIGE, UNÜBERSEHBARE ABSENDER-ANZEIGE -->
-                <div id="giant-sender-banner" style="display: none; flex-direction: column; gap: 4px; padding: 10px 14px; border-radius: 8px; margin-bottom: 10px; font-family: monospace; transition: all 0.3s ease;">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <span id="giant-sender-title" style="font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">SENDEMODUS</span>
-                        <button type="button" onclick="toggleAdminStudioSender()" style="background: rgba(0,0,0,0.4); border: 1px solid currentColor; color: inherit; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;"><i class="fas fa-exchange-alt"></i> Absender umschalten</button>
-                    </div>
-                    <div id="giant-sender-name" style="font-size: 18px; font-weight: 900; letter-spacing: 1.5px; text-transform: uppercase;">437 STUDIO</div>
-                </div>
-
-                <!-- Bild-Vorschau -->
+                <!-- Optimized preview panes -->
                 <div id="msg-img-preview-box" class="preview-pane">
-                    <img id="msg-img-preview" src="" style="height: 38px; border-radius: 4px; object-fit: cover;">
-                    <span style="color: var(--neon-blue); flex-grow: 1;">Bild angehängt</span>
-                    <button type="button" onclick="clearAttachedMessageImage()" style="background: none; border: none; color: var(--neon-pink); cursor: pointer;"><i class="fas fa-times"></i></button>
+                    <img id="msg-img-preview" src="" loading="lazy">
+                    <span>Bild angehängt</span>
+                    <button type="button" onclick="clearAttachedMessageImage()"><i class="fas fa-times"></i></button>
                 </div>
 
-                <!-- Video-Vorschau -->
-                <div id="msg-video-preview-box" class="preview-pane" style="border-color: var(--neon-pink);">
-                    <video id="msg-video-preview" src="" style="height: 40px; border-radius: 4px;" controls></video>
-                    <span style="color: var(--neon-pink); flex-grow: 1;">Video angehängt (Max 15MB)</span>
-                    <button type="button" onclick="clearAttachedMessageVideo()" style="background: none; border: none; color: var(--neon-pink); cursor: pointer;"><i class="fas fa-times"></i></button>
+                <div id="msg-video-preview-box" class="preview-pane">
+                    <video id="msg-video-preview" src="" controls loading="lazy"></video>
+                    <span>Video angehängt (Max 15MB)</span>
+                    <button type="button" onclick="clearAttachedMessageVideo()"><i class="fas fa-times"></i></button>
                 </div>
 
-                <!-- Sprachaufnahme Status -->
-                <div id="voice-status-bar" class="preview-pane" style="border-color: var(--neon-pink); background: rgba(255,0,127,0.08);">
-                    <i class="fas fa-circle" style="color: var(--neon-pink); animation: pulse 1s infinite;"></i>
-                    <span id="voice-timer" style="color: var(--neon-pink); flex-grow: 1;">Audio-Transmission läuft (0s)...</span>
-                    <button type="button" onclick="cancelVoiceRecording()" style="background: none; border: none; color: #aaa; cursor: pointer;">Abbrechen</button>
+                <!-- Simplified voice status -->
+                <div id="voice-status-bar" class="preview-pane">
+                    <i class="fas fa-circle"></i>
+                    <span id="voice-timer">Audio-Transmission läuft...</span>
+                    <button type="button" onclick="cancelVoiceRecording()">Abbrechen</button>
                 </div>
 
+                <!-- Optimized input form -->
                 <form id="chat-input-form" onsubmit="handleSendPrivateMessage(event)" class="input-control-row">
-                    <input type="text" id="msg-text-input" placeholder="Verschlüsselte Nachricht eingeben...">
+                    <input type="text" id="msg-text-input" placeholder="Verschlüsselte Nachricht eingeben..." autocomplete="off">
                     
                     <label class="tool-action-btn" title="Bild anhängen">
                         <i class="fas fa-image"></i>
                         <input type="file" id="msg-image-input" accept="image/*" onchange="previewMessageImage(event)" style="display: none;">
                     </label>
 
-                    <label class="tool-action-btn" style="color: var(--neon-pink);" title="Video anhängen">
+                    <label class="tool-action-btn" title="Video anhängen">
                         <i class="fas fa-video"></i>
                         <input type="file" id="msg-video-input" accept="video/*" onchange="previewMessageVideo(event)" style="display: none;">
                     </label>
 
-                    <button type="button" id="voice-record-btn" onclick="toggleVoiceRecording()" class="tool-action-btn" style="color: var(--neon-green);" title="Sprachnachricht aufnehmen">
+                    <button type="button" id="voice-record-btn" onclick="toggleVoiceRecording()" class="tool-action-btn" title="Sprachnachricht aufnehmen">
                         <i class="fas fa-microphone"></i>
                     </button>
 
-                    <button type="submit" class="btn btn-neon-green" style="padding: 10px 16px; font-size: 12px; cursor: pointer;">
+                    <button type="submit" class="btn btn-neon-green">
                         <i class="fas fa-paper-plane"></i>
                     </button>
                 </form>
@@ -434,8 +531,10 @@
         </div>
     </main>
 
-    <!-- Der fehlerhafte inline-Skriptblock mit der doppelten DEFAULT_AVATAR-Deklaration wurde hier komplett entfernt, um Syntaxfehler zu verhindern. -->
-    <script src="js/app.js"></script>
-    <script src="js/messages.js"></script>
+    <!-- Optimized scripts - load with defer for better performance -->
+    <script src="js/performance-monitor.js" defer></script>
+    <script src="js/app.min.js" defer></script>
+    <script src="js/messages.min.js" defer></script>
+    
 </body>
 </html>

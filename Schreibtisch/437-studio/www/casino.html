@@ -645,6 +645,7 @@
         <ul class="nav-links">
             <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
             <li><a href="forum.html"><i class="fas fa-comments"></i> Forum</a></li>
+            <li><a href="messages.html"><i class="fas fa-envelope"></i> Nachrichten</a></li>
             <li><a href="games.html"><i class="fas fa-gamepad"></i> Games</a></li>
             <li><a href="mitglieder.html"><i class="fas fa-users"></i> Mitglieder</a></li>  
             <li><a href="music.html"><i class="fas fa-music"></i> Musik</a></li>
@@ -670,6 +671,9 @@
             <div>
                 <h1 style="color: #00ff66; font-size: 22px; margin-bottom: 4px; text-transform: uppercase; text-shadow: 0 0 10px rgba(0,255,102,0.4);"><i class="fas fa-cannabis"></i> Cyber Weed Casino Matrix</h1>
                 <p style="color: #888; font-size: 11px;">Das Ultimative 437 Casino</p>
+                <p style="color: #555; font-size: 9px; margin-top: 3px; letter-spacing: 0.5px;">
+                    FAIR PLAY: Alle Spiele nutzen echte Zufallsverteilungen · RTP 94-97% · Hausvorteil 3-6%
+                </p>
                 <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span id="casino-rank-badge" style="background: rgba(0,240,255,0.15); border: 1px solid #00f0ff; color: #00f0ff; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">STUFE 1 (Limit: 1.000)</span>
                     <span id="casino-rank-progress" style="color: #aaa; font-size: 10px;">(0 / 150 Runden bis Stufe 2)</span>
@@ -687,6 +691,9 @@
                     </div>
                     <div style="font-size: 10px; color: #00ff66;">
                         <i class="fas fa-clock"></i> Nächste 25 Chips in: <span id="faucet-timer-display" style="font-weight: bold;">15:00</span>
+                    </div>
+                    <div id="casino-session-info" style="font-size: 9px; color: #888; border-top: 1px solid #1a3a24; padding-top: 4px; width: 100%; text-align: right;">
+                        Session: <span id="casino-session-pnl" style="color: #00ff66;">±0</span> | Limit: <span id="casino-daily-loss" style="color: #ffd700;">0 / 5.000</span>
                     </div>
                 </div>
                 <div style="display: flex; flex-direction: column; gap: 6px;">
@@ -848,8 +855,8 @@
                 <div>
                     <label style="font-size: 11px; color: #ccc;">Vorhersage:</label>
                     <select id="dice-cond" style="background: #05050e; border: 1px solid #333; color: #fff; padding: 7px; border-radius: 4px; font-family: monospace;">
-                        <option value="under">Unter 30 (Reduziert)</option>
-                        <option value="over">Über 70 (Reduziert)</option>
+                        <option value="under">Unter 29 – 29% Chance – 3.30x</option>
+                        <option value="over">Ab 70 – 30% Chance – 3.20x</option>
                     </select>
                 </div>
             </div>
@@ -905,19 +912,41 @@
     </main>
 
     <script src="js/app.js"></script>
+    
     <script>
         const ANTI_CHEAT_SALT = "437_MATRIX_SECURE_SALT_9981";
-        
-        async function generateChecksum(chips, rounds) {
-            const text = `${chips}:${rounds}:${ANTI_CHEAT_SALT}`;
+
+        async function sha256(text) {
             const msgBuffer = new TextEncoder().encode(text);
             const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
             const hashArray = Array.from(new Uint8Array(hashBuffer));
             return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         }
 
+        // Erweiterte Integritaetspruefung: deckt Chips, Runden, Zeitstempel,
+        // Level, Session-Start und einen monoton wachsenden Nonce ab.
+        // Der State-Block in saveCasinoState()/loadCasinoState() ersetzt die
+        // frueheren Einzel-Keys (437_casino_chips/hash/... ) und deckt zusaetzlich
+        // den lokalen Delta-Wert ab.
+
         let casinoChips = 1000;
         let lastTimestamp = Date.now();
+
+        // ==========================================
+        // CHIP-MUTATION: jede Aenderung laeuft ueber diese Funktion,
+        // damit der lokale Delta-Wert (Gewinn/Verlust seit letztem Sync)
+        // immer konsistent zum angezeigten Guthaben bleibt.
+        // ==========================================
+        function adjustChips(amount) {
+            if (!Number.isFinite(amount) || amount === 0) return;
+            const before = casinoChips;
+            casinoChips = Math.max(0, casinoChips + amount);
+            const applied = casinoChips - before;
+            casinoDelta += applied;
+            if (casinoChips <= 0 && applied < 0) {
+                casinoChips = 0;
+            }
+        }
         const INTERVAL_TIME = 15 * 60 * 1000;
         const CHIPS_REWARD = 25;
         let soundMuted = false;
@@ -963,16 +992,51 @@
             return targetTotal - rounds;
         }
 
-        let lastActionTime = 0;
         const SPAM_COOLDOWN_MS = 600;
+        const _gameActionTimes = {};
+        const _gameActionCounts = {};
+        const MAX_ACTIONS_PER_MINUTE = 30;
+        const _gameBusy = {};
 
-        function checkSpamCooldown() {
+        // Faehigkeits-Cache des Backends. Verhindert, dass bei fehlender
+        // Migration bei jeder Runde erneut fehlgeschlagene Requests an den
+        // Server gehen (Console-Spam + needless Roundtrips).
+        //   rpc:         null = unbekannt, true = verfuegbar, false = fehlt
+        //   lossColumns: null = unbekannt, true = verfuegbar, false = fehlt
+        const casinoServerCaps = { rpc: null, lossColumns: null };
+
+        // Sperrt ein Spiel, waehrend es noch asynchron laeuft (Server-Check).
+        // Verhindert Doppelstarts durch schnelle Klicks.
+        function isGameBusy(gameKey) {
+            return _gameBusy[gameKey] === true;
+        }
+
+        function setGameBusy(gameKey, busy) {
+            _gameBusy[gameKey] = busy;
+        }
+
+        function checkSpamCooldown(gameKey = "default") {
             let now = Date.now();
-            if (now - lastActionTime < SPAM_COOLDOWN_MS) {
-                console.warn("Anti-Cheat: Zu schnelle Aktion abgefangen.");
+
+            if (_gameActionTimes[gameKey] === undefined) _gameActionTimes[gameKey] = 0;
+            if (!_gameActionCounts[gameKey]) _gameActionCounts[gameKey] = { count: 0, resetAt: now + 60000 };
+
+            if (now > _gameActionCounts[gameKey].resetAt) {
+                _gameActionCounts[gameKey] = { count: 0, resetAt: now + 60000 };
+            }
+
+            if (_gameActionCounts[gameKey].count >= MAX_ACTIONS_PER_MINUTE) {
+                console.warn(`Anti-Cheat: Rate limit erreicht für ${gameKey}.`);
                 return false;
             }
-            lastActionTime = now;
+
+            if (now - _gameActionTimes[gameKey] < SPAM_COOLDOWN_MS) {
+                console.warn(`Anti-Cheat: Zu schnelle Aktion abgefangen (${gameKey}).`);
+                return false;
+            }
+
+            _gameActionTimes[gameKey] = now;
+            _gameActionCounts[gameKey].count++;
             return true;
         }
 
@@ -1066,9 +1130,13 @@
             });
         });
 
-        function validateBetAmount(bet) {
+        async function validateBetAmount(bet, gameKey = "default") {
             if (isNaN(bet) || bet <= 0) {
                 alert("Ungültiger Einsatz.");
+                return false;
+            }
+            if (bet < MIN_BET) {
+                alert(`Der Mindesteinsatz beträgt ${MIN_BET} Chips.`);
                 return false;
             }
             if (bet > casinoBetLimit) {
@@ -1078,6 +1146,104 @@
                 playCasinoSound('lose');
                 return false;
             }
+            if (bet > casinoChips) {
+                alert("Nicht genügend Chips für diesen Einsatz.");
+                return false;
+            }
+            if (!checkResponsibleGamingLimits()) {
+                return false;
+            }
+            if (typeof supabaseClient !== "undefined" && supabaseClient && currentUser) {
+                const serverOk = await checkServerBetLimit(bet);
+                if (!serverOk) return false;
+            }
+            return true;
+        }
+
+        // Serverseitige Gegenpruefung: Sperrstatus und Verlustlimits werden
+        // gegen die users-Tabelle geprueft. Der Sperrstatus wird immer
+        // separat geprueft, damit fehlende Verlustspalten die Sperre nicht
+        // aushebeln koennen. Fehlt eine Spalte, greift weiterhin die
+        // lokale Pruefung.
+        async function checkServerBetLimit(bet) {
+            let banned = false;
+            let serverDaily = null;
+            let serverSession = null;
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from("users")
+                    .select("casino_banned")
+                    .ilike("username", currentUser.username)
+                    .maybeSingle();
+
+                if (error) {
+                    console.warn("Sperrstatus konnte nicht geprueft werden:", error.message);
+                } else if (data && data.casino_banned === true) {
+                    banned = true;
+                }
+            } catch (e) {
+                console.warn("Sperrstatus-Pruefung fehlgeschlagen:", e);
+            }
+
+            if (banned) {
+                document.getElementById("casino-ban-screen").classList.remove("hidden");
+                return false;
+            }
+
+            // Verlustlimits serverseitig (Spalten koennen in aelteren Schemata fehlen)
+            if (casinoServerCaps.lossColumns !== false) {
+                try {
+                    const today = new Date().toISOString().slice(0, 10);
+                    const { data, error } = await supabaseClient
+                        .from("users")
+                        .select("casino_daily_loss, casino_session_loss")
+                        .ilike("username", currentUser.username)
+                        .maybeSingle();
+
+                    if (error) {
+                        if (casinoServerCaps.lossColumns === null) {
+                            casinoServerCaps.lossColumns = false;
+                            console.warn(
+                                "Casino: serverseitige Verlustlimits nicht verfuegbar (" +
+                                error.message +
+                                "). Migration db/migrations/20261019_casino_loss_limits.sql anwenden."
+                            );
+                        }
+                    } else {
+                        casinoServerCaps.lossColumns = true;
+                        // Der Server-Tagesverlust gilt nur fuer den Tag, an dem er
+                        // zuletzt geschrieben wurde (siehe syncServerLoss).
+                        const lastServerDate = localStorage.getItem("437_casino_server_daily_date");
+                        serverDaily = (lastServerDate === today) ? (parseInt(data.casino_daily_loss) || 0) : 0;
+                        serverSession = parseInt(data.casino_session_loss) || 0;
+                    }
+                } catch (e) {
+                    casinoServerCaps.lossColumns = false;
+                    console.warn("Server-Verlustlimit nicht verfuegbar, lokale Pruefung aktiv:", e);
+                }
+            }
+
+            const dailyTotal = Math.max(serverDaily || 0, getDailyLoss());
+            if (dailyTotal + bet > DAILY_LOSS_LIMIT) {
+                showCasinoLimitModal(
+                    "⏸️ TAGES-LIMIT ERREICHT",
+                    `Dein Tagesverlust liegt bei ${dailyTotal.toLocaleString()} Chips. Mit diesem Einsatz würde das Limit von ${DAILY_LOSS_LIMIT.toLocaleString()} Chips überschritten.`
+                );
+                return false;
+            }
+
+            const sessionStart = getSessionStartChips();
+            const localSessionLoss = Math.max(0, sessionStart - casinoChips);
+            const sessionTotal = Math.max(serverSession || 0, localSessionLoss);
+            if (sessionTotal + bet > SESSION_LOSS_LIMIT) {
+                showCasinoLimitModal(
+                    "⏸️ SESSION-LIMIT ERREICHT",
+                    `Dein Session-Verlust liegt bei ${sessionTotal.toLocaleString()} Chips. Mit diesem Einsatz würde das Limit von ${SESSION_LOSS_LIMIT.toLocaleString()} Chips überschritten.`
+                );
+                return false;
+            }
+
             return true;
         }
 
@@ -1187,12 +1353,12 @@
         }
 
         function claimAmnesiaManagerReward() {
-            if (!checkSpamCooldown()) return;
+            if (!checkSpamCooldown("manager")) return;
             let claimed = localStorage.getItem("437_amnesia_manager_claimed");
             if (claimed === "true") return;
 
             localStorage.setItem("437_amnesia_manager_claimed", "true");
-            casinoChips += 5000;
+            adjustChips(5000);
             updateCasinoUI();
             playCasinoSound('claim');
 
@@ -1353,6 +1519,93 @@
             }
         }
 
+        let roundStartChips = 0;
+        let roundBet = 0;
+        let roundPending = false;
+        let roundGameKey = "slots";
+
+        function beginRound(bet = 0, gameKey = "slots") {
+            roundStartChips = casinoChips;
+            roundBet = bet;
+            roundGameKey = gameKey;
+            roundPending = bet > 0;
+        }
+
+        function endRound() {
+            const delta = casinoChips - roundStartChips;
+            if (delta < 0) {
+                trackDailyLoss(-delta);
+            }
+            const bet = roundBet;
+            const payout = Math.max(0, Math.floor(casinoChips - (roundStartChips - bet)));
+            const gameKey = roundGameKey;
+            const netLoss = Math.max(0, bet - payout);
+            roundBet = 0;
+
+            if (!roundPending) return;
+            roundPending = false;
+
+            // Bevorzugt den Server-Rundenabschluss nutzen (atomar + Limit-Check).
+            commitRoundToServer(bet, payout, gameKey).then(committed => {
+                if (committed) {
+                    // Server ist die Wahrheit -> lokalen Stand angleichen
+                    updateCasinoUI();
+                    saveCasinoState();
+                    loadCasinoLeaderboard();
+                } else {
+                    // RPC nicht verfuegbar: Verlust manuell nachziehen und
+                    // ueber den klassischen Weg speichern.
+                    if (netLoss > 0) syncServerLoss(netLoss);
+                    saveCasinoData();
+                }
+            });
+        }
+
+        // Verlustwerte auch serverseitig fortschreiben, damit die Limits
+        // ueber Geraete hinweg gelten. Fehlt die Spalte, wird der lokale
+        // Zaehler weiterverwendet.
+        async function syncServerLoss(loss) {
+            if (typeof currentUser === "undefined" || !currentUser) return;
+            if (typeof supabaseClient === "undefined" || !supabaseClient) return;
+
+            try {
+                const today = new Date().toISOString().slice(0, 10);
+                const { data } = await supabaseClient
+                    .from("users")
+                    .select("casino_daily_loss, casino_session_loss")
+                    .ilike("username", currentUser.username)
+                    .maybeSingle();
+
+                if (!data) return;
+
+                // Der Serverwert zaehlt nur fuer den Tag, an dem er zuletzt
+                // geschrieben wurde. Sonst wuerde ein alter Tagesverlust
+                // das Limit auch am Folgetag blockieren.
+                const lastServerDate = localStorage.getItem("437_casino_server_daily_date");
+                const serverDaily = (lastServerDate === today) ? (parseInt(data.casino_daily_loss) || 0) : 0;
+                const serverSession = parseInt(data.casino_session_loss) || 0;
+
+                const newDaily = serverDaily + loss;
+                const newSession = serverSession + loss;
+
+                const { error } = await supabaseClient
+                    .from("users")
+                    .update({
+                        casino_daily_loss: newDaily,
+                        casino_session_loss: newSession
+                    })
+                    .eq("username", currentUser.username);
+
+                if (error) {
+                    console.warn("Server-Verlustsync nicht moeglich:", error.message);
+                } else {
+                    localStorage.setItem("437_casino_server_daily_date", today);
+                }
+            } catch (e) {
+                console.warn("Server-Verlustsync fehlgeschlagen:", e);
+            }
+        }
+
         function checkChipsOrWarn(requiredAmount) {
             if (casinoChips < requiredAmount) {
                 const modalText = document.getElementById("modal-warning-text");
@@ -1361,83 +1614,240 @@
                 playCasinoSound('lose');
                 return false;
             }
+            if (!checkResponsibleGamingLimits()) return false;
             return true;
+        }
+
+        // ==========================================
+        // RESPONSIBLE GAMING LIMITEN (Sicherheitsfeature)
+        // ==========================================
+        const DAILY_LOSS_LIMIT = 5000;
+        const SESSION_LOSS_LIMIT = 2000;
+        const MIN_BET = 10;
+
+        function getSessionStartChips() {
+            const stored = sessionStorage.getItem("437_casino_session_start");
+            if (stored) return parseInt(stored) || casinoChips;
+            sessionStorage.setItem("437_casino_session_start", String(casinoChips));
+            return casinoChips;
+        }
+
+        function getDailyLoss() {
+            const today = new Date().toISOString().slice(0, 10);
+            const stored = localStorage.getItem("437_casino_daily_loss");
+            if (!stored) return 0;
+            try {
+                const data = JSON.parse(stored);
+                if (data.date !== today) return 0;
+                return data.amount || 0;
+            } catch (e) { return 0; }
+        }
+
+        function trackDailyLoss(amount) {
+            if (amount <= 0) return;
+            const today = new Date().toISOString().slice(0, 10);
+            let data = { date: today, amount: getDailyLoss() };
+            data.amount += amount;
+            localStorage.setItem("437_casino_daily_loss", JSON.stringify(data));
+        }
+
+        function checkResponsibleGamingLimits() {
+            const sessionStart = getSessionStartChips();
+            const sessionLoss = Math.max(0, sessionStart - casinoChips);
+            const dailyLoss = getDailyLoss();
+
+            if (sessionLoss >= SESSION_LOSS_LIMIT) {
+                showCasinoLimitModal("⏸️ SESSION-LIMIT ERREICHT", `Du hast in dieser Session ${sessionLoss.toLocaleString()} Chips verloren. Das Limit beträgt ${SESSION_LOSS_LIMIT.toLocaleString()} Chips. Bitte mache eine Pause oder lade die Seite neu.`);
+                return false;
+            }
+
+            if (dailyLoss >= DAILY_LOSS_LIMIT) {
+                showCasinoLimitModal("⏸️ TAGES-LIMIT ERREICHT", `Du hast heute insgesamt ${dailyLoss.toLocaleString()} Chips verloren. Das Tageslimit beträgt ${DAILY_LOSS_LIMIT.toLocaleString()} Chips.`);
+                return false;
+            }
+
+            return true;
+        }
+
+        function showCasinoLimitModal(title, text) {
+            const modal = document.getElementById("low-chips-modal");
+            if (!modal) { alert(`${title}\n\n${text}`); return; }
+            const titleEl = modal.querySelector("h3");
+            const textEl = modal.querySelector("p");
+            if (titleEl) titleEl.textContent = title;
+            if (textEl) textEl.textContent = text;
+            modal.classList.remove("hidden");
+            playCasinoSound('lose');
         }
 
         function closeLowChipsModal() {
             document.getElementById("low-chips-modal").classList.add("hidden");
         }
 
-        async function loadCasinoData() {
-            let savedChips = localStorage.getItem("437_casino_chips");
-            let savedTime = localStorage.getItem("437_casino_last_time");
-            let savedRounds = localStorage.getItem("437_casino_rounds");
-            let savedHash = localStorage.getItem("437_casino_hash");
+        // Session-Reset: beim ersten Aufruf einer neuen Browser-Session
+        // wird der serverseitige Session-Verlust zurueckgesetzt, damit
+        // das Limit pro Session und nicht dauerhaft gilt.
+        async function ensureServerSessionReset() {
+            if (typeof currentUser === "undefined" || !currentUser) return;
+            if (typeof supabaseClient === "undefined" || !supabaseClient) return;
+            if (sessionStorage.getItem("437_casino_server_session_synced") === "1") return;
 
-            if (savedChips !== null && savedRounds !== null && savedHash !== null) {
-                let parsedChips = parseInt(savedChips);
-                let parsedRounds = parseInt(savedRounds);
-                let expectedHash = await generateChecksum(parsedChips, parsedRounds);
+            sessionStorage.setItem("437_casino_server_session_synced", "1");
 
-                if (expectedHash !== savedHash) {
-                    console.warn("Anti-Cheat: Manipulierter Speicherstand erkannt! Guthaben wird zurückgesetzt.");
-                    localStorage.clear();
-                    casinoChips = 1000;
-                    casinoRoundsPlayed = 0;
-                } else {
-                    casinoChips = parsedChips;
-                    casinoRoundsPlayed = parsedRounds;
-                }
+            try {
+                const { error } = await supabaseClient
+                    .from("users")
+                    .update({ casino_session_loss: 0 })
+                    .eq("username", currentUser.username);
+                if (error) console.warn("Server-Session-Reset nicht moeglich:", error.message);
+            } catch (e) {
+                console.warn("Server-Session-Reset fehlgeschlagen:", e);
             }
+        }
 
-            if (savedTime !== null) lastTimestamp = parseInt(savedTime);
-            else lastTimestamp = Date.now();
+        // ==========================================
+        // SICHERHEIT: SERVER IST DIE EINZIGE WAHRHEIT
+        // Lokal wird nur noch ein DELTA (Gewinn/Verlust seit letztem Sync)
+        // gespeichert. Ein manipulation des lokalen Speicherstands kann das
+        // Chip-Guthaben dadurch nicht mehr ueberhoehen.
+        // ==========================================
+        const MAX_PLAUSIBLE_CHIPS = 1000000000;
+        const STATE_STORAGE_KEY = "437_casino_state";
+        let casinoBaseChips = 1000;
+        let casinoDelta = 0;
+
+        function getStateSignature(state) {
+            const payload = [
+                state.base,
+                state.delta,
+                state.rounds,
+                state.level,
+                state.lastTime,
+                state.nonce,
+                ANTI_CHEAT_SALT
+            ].join(":");
+            return sha256(payload);
+        }
+
+        async function saveCasinoState() {
+            const nonce = parseInt(localStorage.getItem("437_casino_nonce") || "0") + 1;
+            localStorage.setItem("437_casino_nonce", String(nonce));
+
+            const state = {
+                base: Math.max(0, Math.min(MAX_PLAUSIBLE_CHIPS, Math.floor(casinoBaseChips))),
+                delta: Math.max(0, Math.min(MAX_PLAUSIBLE_CHIPS, Math.floor(casinoDelta))),
+                rounds: Math.max(0, Math.floor(casinoRoundsPlayed)),
+                level: Math.max(1, Math.min(10, Math.floor(casinoRankLevel))),
+                lastTime: lastTimestamp,
+                nonce: nonce
+            };
+
+            state.sig = await getStateSignature(state);
+            localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(state));
+            return state;
+        }
+
+        async function loadCasinoState() {
+            const raw = localStorage.getItem(STATE_STORAGE_KEY);
+            if (!raw) return null;
+            try {
+                const state = JSON.parse(raw);
+                if (!state || typeof state !== "object") return null;
+
+                const expectedSig = await getStateSignature(state);
+                if (expectedSig !== state.sig) {
+                    console.warn("Anti-Cheat: Stat-Signatur ungueltig - lokaler Delta wird verworfen.");
+                    localStorage.removeItem(STATE_STORAGE_KEY);
+                    return null;
+                }
+                return state;
+            } catch (e) {
+                localStorage.removeItem(STATE_STORAGE_KEY);
+                return null;
+            }
+        }
+
+        async function loadCasinoData() {
+            const savedState = await loadCasinoState();
+
+            if (savedState) {
+                casinoBaseChips = savedState.base;
+                casinoDelta = savedState.delta;
+                casinoRoundsPlayed = savedState.rounds;
+                casinoRankLevel = savedState.level;
+                lastTimestamp = savedState.lastTime;
+                casinoChips = casinoBaseChips + casinoDelta;
+            }
 
             let previousLevel = casinoRankLevel;
             casinoRankLevel = calculateLevelFromRounds(casinoRoundsPlayed);
             casinoBetLimit = rankLimits[casinoRankLevel];
             updateLimitInputs();
 
-            let now = Date.now();
+            const now = Date.now();
+            if (lastTimestamp > now + 5000) {
+                console.warn("Anti-Cheat: Zeitmanipulation erkannt - Zeitstempel korrigiert.");
+                lastTimestamp = now;
+            }
+
+            // Faucet-Guthaben nur auf Basis des Serverwerts gutschreiben
             let elapsed = now - lastTimestamp;
             if (elapsed > 0) {
                 let intervalsPassed = Math.floor(elapsed / INTERVAL_TIME);
                 if (intervalsPassed > 0) {
-                    let earned = intervalsPassed * CHIPS_REWARD;
-                    casinoChips += earned;
+                    const earned = Math.min(intervalsPassed, 48) * CHIPS_REWARD;
+                    casinoDelta += earned;
                     lastTimestamp += intervalsPassed * INTERVAL_TIME;
                 }
             }
 
             if (typeof currentUser !== "undefined" && currentUser && typeof supabaseClient !== "undefined" && supabaseClient) {
-                supabaseClient.from("users").select("casino_chips, casino_rounds, casino_banned").ilike("username", currentUser.username).maybeSingle().then(({ data }) => {
-                    if (data) {
-                        if (data.casino_banned === true) {
-                            document.getElementById("casino-ban-screen").classList.remove("hidden");
-                            return;
-                        }
-                        if (data.casino_rounds !== undefined && data.casino_rounds !== null) {
-                            let serverRounds = parseInt(data.casino_rounds);
-                            let serverLevel = calculateLevelFromRounds(serverRounds);
-                            if (serverRounds > casinoRoundsPlayed) {
-                                casinoRoundsPlayed = serverRounds;
-                                casinoRankLevel = serverLevel;
-                                casinoBetLimit = rankLimits[casinoRankLevel];
-                                updateLimitInputs();
-                                updateRankUI();
-                                if (casinoRankLevel > previousLevel) {
-                                    showLevelUpModal(casinoRankLevel);
-                                }
+                const { data } = await supabaseClient
+                    .from("users")
+                    .select("casino_chips, casino_rounds, casino_banned")
+                    .ilike("username", currentUser.username)
+                    .maybeSingle();
+
+                if (data) {
+                    if (data.casino_banned === true) {
+                        document.getElementById("casino-ban-screen").classList.remove("hidden");
+                        return;
+                    }
+                    if (data.casino_rounds !== undefined && data.casino_rounds !== null) {
+                        let serverRounds = parseInt(data.casino_rounds) || 0;
+                        if (serverRounds > casinoRoundsPlayed) {
+                            casinoRoundsPlayed = serverRounds;
+                            casinoRankLevel = calculateLevelFromRounds(serverRounds);
+                            casinoBetLimit = rankLimits[casinoRankLevel];
+                            updateLimitInputs();
+                            updateRankUI();
+                            if (casinoRankLevel > previousLevel) {
+                                showLevelUpModal(casinoRankLevel);
                             }
                         }
-                        if (data.casino_chips !== undefined) {
-                            casinoChips = Math.max(casinoChips, data.casino_chips);
-                            updateCasinoUI();
-                            checkHighrollerAchievements(casinoChips);
-                        }
                     }
-                });
+                    if (data.casino_chips !== undefined && data.casino_chips !== null) {
+                        // Serverwert ist die Basis - der lokale Delta wird addiert.
+                        // Ein manipulierter lokaler Chip-Wert kann so nichts mehr aufblasen.
+                        const serverChips = Math.max(0, parseInt(data.casino_chips) || 0);
+                        const total = serverChips + casinoDelta;
+                        if (total > MAX_PLAUSIBLE_CHIPS) {
+                            console.warn("Anti-Cheat: Unplausibles Guthaben erkannt - auf Serverwert korrigiert.");
+                            casinoDelta = 0;
+                            casinoBaseChips = serverChips;
+                        } else {
+                            casinoBaseChips = serverChips;
+                        }
+                        casinoChips = casinoBaseChips + casinoDelta;
+                        updateCasinoUI();
+                        checkHighrollerAchievements(casinoChips);
+                    }
+                }
             }
+
+            if (casinoChips === undefined || casinoChips === null) casinoChips = casinoBaseChips + casinoDelta;
+
+            await ensureServerSessionReset();
 
             updateCasinoUI();
             updateRankUI();
@@ -1447,20 +1857,123 @@
         }
 
         async function saveCasinoData() {
-            let hash = await generateChecksum(casinoChips, casinoRoundsPlayed);
-            localStorage.setItem("437_casino_chips", casinoChips.toString());
-            localStorage.setItem("437_casino_last_time", lastTimestamp.toString());
-            localStorage.setItem("437_casino_rounds", casinoRoundsPlayed.toString());
-            localStorage.setItem("437_casino_hash", hash);
-            checkHighrollerAchievements(casinoChips);
+            const online = typeof currentUser !== "undefined" && currentUser
+                && typeof supabaseClient !== "undefined" && supabaseClient;
 
-            if (typeof currentUser !== "undefined" && currentUser && typeof supabaseClient !== "undefined" && supabaseClient) {
-                supabaseClient.from("users").update({ 
-                    casino_chips: casinoChips,
-                    casino_rounds: casinoRoundsPlayed 
-                }).eq("username", currentUser.username).then(() => {
+            if (online) {
+                // Waehrend einer laufenden Runde wird das Chip-Guthaben NICHT
+                // direkt geschrieben - das uebernimmt commitRoundToServer()
+                // atomar inkl. Limitpruefung. Sonst wuerde der Einsatz doppelt
+                // gebucht.
+                if (roundPending) {
+                    await saveCasinoState();
+                    return;
+                }
+
+                const total = Math.max(0, Math.min(MAX_PLAUSIBLE_CHIPS, Math.floor(casinoChips)));
+                const { error } = await supabaseClient
+                    .from("users")
+                    .update({
+                        casino_chips: total,
+                        casino_rounds: casinoRoundsPlayed
+                    })
+                    .eq("username", currentUser.username);
+
+                if (!error) {
+                    casinoBaseChips = total;
+                    casinoDelta = 0;
                     loadCasinoLeaderboard();
+                }
+            } else {
+                // Offline-Modus: lokaler Stand bleibt erhalten
+                casinoBaseChips = Math.max(0, Math.floor(casinoChips) - casinoDelta);
+            }
+
+            await saveCasinoState();
+            checkHighrollerAchievements(casinoChips);
+        }
+
+        // ==========================================
+        // SERVER-RUNDEN-ABSCHLUSS (bevorzugter Pfad)
+        // Die RPC-Funktion casino_apply_round schreibt Chips und Verlustlimits
+        // atomar auf dem Server. Ist sie nicht vorhanden (Migration fehlt),
+        // wird auf den klassischen Update-Weg zurueckgefallen.
+        // ==========================================
+        // Faehigkeits-Cache: verhindert, dass bei fehlender Migration bei
+        // jeder Runde erneut fehlgeschlagene Requests an den Server gehen.
+        async function commitRoundToServer(bet, payout, gameKey = "slots") {
+            if (typeof currentUser === "undefined" || !currentUser) return false;
+            if (typeof supabaseClient === "undefined" || !supabaseClient) return false;
+            if (casinoServerCaps.rpc === false) return false;
+
+            try {
+                const { data, error } = await supabaseClient.rpc("casino_apply_round", {
+                    p_username: currentUser.username,
+                    p_game: String(gameKey || "slots"),
+                    p_bet: Math.max(0, Math.floor(bet)),
+                    p_payout: Math.max(0, Math.floor(payout))
                 });
+
+                if (error) {
+                    // RPC nicht vorhanden -> klassischer Weg, aber nur einmal pruefen
+                    if (casinoServerCaps.rpc === null) {
+                        casinoServerCaps.rpc = false;
+                        console.warn(
+                            "Casino: serverseitige Rundenpruefung nicht verfuegbar (" +
+                            error.message +
+                            "). Migration db/migrations/20261019_casino_loss_limits.sql anwenden."
+                        );
+                    }
+                    return false;
+                }
+                if (!data) return false;
+                casinoServerCaps.rpc = true;
+
+                if (data.allowed === false) {
+                    if (data.reason === "banned") {
+                        document.getElementById("casino-ban-screen").classList.remove("hidden");
+                    } else if (data.reason === "daily_limit") {
+                        showCasinoLimitModal(
+                            "⏸️ TAGES-LIMIT ERREICHT",
+                            `Dein Tagesverlust liegt bei ${(parseInt(data.daily_loss) || 0).toLocaleString()} Chips. Das Limit von ${DAILY_LOSS_LIMIT.toLocaleString()} Chips ist erreicht.`
+                        );
+                    } else if (data.reason === "session_limit") {
+                        showCasinoLimitModal(
+                            "⏸️ SESSION-LIMIT ERREICHT",
+                            `Dein Session-Verlust liegt bei ${(parseInt(data.session_loss) || 0).toLocaleString()} Chips. Das Limit von ${SESSION_LOSS_LIMIT.toLocaleString()} Chips ist erreicht.`
+                        );
+                    } else if (data.reason === "payout_too_high") {
+                        showCasinoLimitModal(
+                            "⛔ RUNDE ABGELEHNT",
+                            "Der Server hat diese Runde abgelehnt, weil der gemeldete Gewinn nicht dem Spiel entsprechen kann. Der lokale Stand wurde auf den Serverwert zurueckgesetzt."
+                        );
+                    } else {
+                        showCasinoLimitModal(
+                            "⛔ RUNDE ABGELEHNT",
+                            `Der Server hat diese Runde abgelehnt (${data.reason || "unbekannt"}). Der lokale Stand wurde auf den Serverwert zurueckgesetzt.`
+                        );
+                    }
+
+                    // Abgelehnte Runde: Serverwert ist die Wahrheit.
+                    const rejectedChips = Math.max(0, parseInt(data.chips) || 0);
+                    casinoBaseChips = rejectedChips;
+                    casinoDelta = 0;
+                    casinoChips = rejectedChips;
+                    return true;
+                }
+
+                // Server ist jetzt die Wahrheit
+                const serverChips = Math.max(0, parseInt(data.chips) || 0);
+                casinoBaseChips = serverChips;
+                casinoDelta = 0;
+                casinoChips = serverChips;
+                return true;
+            } catch (e) {
+                if (casinoServerCaps.rpc === null) {
+                    casinoServerCaps.rpc = false;
+                    console.warn("Casino: Server-Rundenabschluss nicht erreichbar:", e);
+                }
+                return false;
             }
         }
 
@@ -1476,7 +1989,7 @@
             let remaining = INTERVAL_TIME - elapsed;
 
             if (remaining <= 0) {
-                casinoChips += CHIPS_REWARD;
+                adjustChips(CHIPS_REWARD);
                 lastTimestamp += INTERVAL_TIME;
                 saveCasinoData();
                 updateCasinoUI();
@@ -1498,6 +2011,17 @@
         function updateCasinoUI() {
             const display = document.getElementById("casino-chips-display");
             if (display) display.textContent = `🪙 ${casinoChips.toLocaleString()} Chips`;
+
+            const sessionStart = getSessionStartChips();
+            const pnl = casinoChips - sessionStart;
+            const pnlEl = document.getElementById("casino-session-pnl");
+            if (pnlEl) {
+                pnlEl.textContent = `${pnl >= 0 ? "+" : ""}${pnl.toLocaleString()}`;
+                pnlEl.style.color = pnl >= 0 ? "#00ff66" : "#ff0055";
+            }
+
+            const lossEl = document.getElementById("casino-daily-loss");
+            if (lossEl) lossEl.textContent = `${getDailyLoss().toLocaleString()} / ${DAILY_LOSS_LIMIT.toLocaleString()}`;
         }
 
         function switchCasinoTab(tabName, event) {
@@ -1513,13 +2037,26 @@
         // ==========================================
         // REAL 5x5 AUTOMATEN SLOTS ENGINE (EXAKTE LINIEN)
         // ==========================================
+        // Auszahlungstabelle mit mathematisch belegter Auszahlungsquote (RTP ~94%)
+        const SLOT_RTP_TARGET = 0.94;
         const slotSymbols = [
-            { icon: "🌿", name: "Bud", mult: { 3: 0.5, 4: 1.5, 5: 3.0 } },
-            { icon: "💨", name: "Smoke", mult: { 3: 1.0, 4: 2.5, 5: 5.0 } },
-            { icon: "🍯", name: "Dab", mult: { 3: 1.5, 4: 4.0, 5: 8.0 } },
-            { icon: "🔥", name: "Lighter", mult: { 3: 2.0, 4: 6.0, 5: 12.0 } },
-            { icon: "🚀", name: "Space", mult: { 3: 4.0, 4: 10.0, 5: 25.0 } },
-            { icon: "💎", name: "Crystal (Scatter)", mult: { 3: 0, 4: 0, 5: "10 Freispiele" } }
+            { icon: "🌿", name: "Bud", weight: 30, mult: { 3: 1.0, 4: 3.0, 5: 6.0 } },
+            { icon: "💨", name: "Smoke", weight: 24, mult: { 3: 2.0, 4: 5.0, 5: 10.0 } },
+            { icon: "🍯", name: "Dab", weight: 18, mult: { 3: 3.0, 4: 8.0, 5: 16.0 } },
+            { icon: "🔥", name: "Lighter", weight: 13, mult: { 3: 4.0, 4: 12.0, 5: 24.0 } },
+            { icon: "🚀", name: "Space", weight: 9, mult: { 3: 8.0, 4: 20.0, 5: 50.0 } },
+            { icon: "💎", name: "Crystal (Scatter)", weight: 6, mult: { 3: 2.0, 4: 10.0, 5: 30.0 } }
+        ];
+        const SLOT_TOTAL_WEIGHT = slotSymbols.reduce((sum, s) => sum + s.weight, 0);
+
+        const SLOT_PAYLINES = [
+            [[0,0],[0,1],[0,2],[0,3],[0,4]],
+            [[1,0],[1,1],[1,2],[1,3],[1,4]],
+            [[2,0],[2,1],[2,2],[2,3],[2,4]],
+            [[3,0],[3,1],[3,2],[3,3],[3,4]],
+            [[4,0],[4,1],[4,2],[4,3],[4,4]],
+            [[0,0],[1,1],[2,2],[3,3],[4,4]],
+            [[4,0],[3,1],[2,2],[1,3],[0,4]]
         ];
 
         function updatePaytableDisplay() {
@@ -1529,17 +2066,6 @@
             const currentBet = betInput ? (parseInt(betInput.value) || 50) : 50;
 
             container.innerHTML = slotSymbols.map(sym => {
-                if (sym.icon === "💎") {
-                    return `
-                        <div class="paytable-sidebar-item">
-                            <span class="sym">${sym.icon}</span>
-                            <div class="values">
-                                <span style="color:#00f0ff;">5x in Linie = 🎁 10 Freispiele</span>
-                            </div>
-                        </div>
-                    `;
-                }
-
                 let v3 = Math.floor(currentBet * sym.mult[3]).toLocaleString();
                 let v4 = Math.floor(currentBet * sym.mult[4]).toLocaleString();
                 let v5 = Math.floor(currentBet * sym.mult[5]).toLocaleString();
@@ -1550,7 +2076,7 @@
                         <div class="values">
                             3x: 🪙 ${v3}<br>
                             4x: 🪙 ${v4}<br>
-                            5x: 🪙 ${v5}
+                            5x: 🪙 ${v5}${sym.icon === "💎" ? "<br>🎁 5x = 10 Freispiele" : ""}
                         </div>
                     </div>
                 `;
@@ -1570,17 +2096,25 @@
         }
 
         function getRandomSymbolWeighted() {
-            let rand = Math.random();
-            if (rand < 0.025) return slotSymbols[5];
-            let normalIdx = Math.floor(Math.random() * 5);
-            return slotSymbols[normalIdx];
+            let roll = Math.random() * SLOT_TOTAL_WEIGHT;
+            for (const sym of slotSymbols) {
+                roll -= sym.weight;
+                if (roll <= 0) return sym;
+            }
+            return slotSymbols[0];
         }
 
-        function spinSlotsRealEngine() {
-            if (!checkSpamCooldown()) return;
+        async function spinSlotsRealEngine() {
+            if (isGameBusy("slots")) return;
+            if (!checkSpamCooldown("slots")) return;
 
             const bet = parseInt(document.getElementById("slot-bet").value);
-            if (!validateBetAmount(bet)) return;
+            setGameBusy("slots", true);
+            try {
+                if (!await validateBetAmount(bet)) return;
+            } finally {
+                setGameBusy("slots", false);
+            }
 
             const msg = document.getElementById("slot-message");
             const gambleBtn = document.getElementById("slot-gamble-btn");
@@ -1589,7 +2123,8 @@
 
             if (freeSpinsRemaining <= 0) {
                 if (!checkChipsOrWarn(bet)) return;
-                casinoChips -= bet;
+                beginRound(bet, "slots");
+                adjustChips(-bet);
                 updateCasinoUI();
                 recordRoundPlayed();
             } else {
@@ -1603,11 +2138,8 @@
             const grid = document.getElementById("slot-grid-5x5");
             const cells = grid.querySelectorAll(".slot-cell-5x5");
 
-            let betRatio = bet / casinoBetLimit;
-            let baseWinChance = 0.30 - (betRatio * 0.12);
-            if (freeSpinsRemaining > 0) baseWinChance = 0.48;
-            let isWin = Math.random() < baseWinChance;
-
+            // Keine erzwungenen Gewinne mehr - die Walzen sind echt randomisiert.
+            // Der RTP ergibt sich rein aus der Auszahlungstabelle + Symbolgewichten.
             let board = [];
             for (let r = 0; r < 5; r++) {
                 let row = [];
@@ -1615,23 +2147,6 @@
                     row.push(getRandomSymbolWeighted());
                 }
                 board.push(row);
-            }
-
-            if (isWin) {
-                let winSym = slotSymbols[Math.floor(Math.random() * (slotSymbols.length - 1))];
-                let lineRow = Math.floor(Math.random() * 5);
-                let matchCount = Math.random() > 0.4 ? 3 : (Math.random() > 0.5 ? 4 : 5);
-                for (let c = 0; c < matchCount; c++) {
-                    board[lineRow][c] = winSym;
-                }
-            }
-
-            let triggerFreeSpins = Math.random() < 0.02;
-            if (triggerFreeSpins) {
-                let freeSpinRow = Math.floor(Math.random() * 5);
-                for (let c = 0; c < 5; c++) {
-                    board[freeSpinRow][c] = slotSymbols[5];
-                }
             }
 
             msg.textContent = "Walzen drehen sich...";
@@ -1688,17 +2203,7 @@
             let winningCoords = new Set();
             let gotFreeSpinsThisRound = false;
 
-            let paylines = [
-                [[0,0],[0,1],[0,2],[0,3],[0,4]],
-                [[1,0],[1,1],[1,2],[1,3],[1,4]],
-                [[2,0],[2,1],[2,2],[2,3],[2,4]],
-                [[3,0],[3,1],[3,2],[3,3],[3,4]],
-                [[4,0],[4,1],[4,2],[4,3],[4,4]],
-                [[0,0],[1,1],[2,2],[3,3],[4,4]],
-                [[4,0],[3,1],[2,2],[1,3],[0,4]]
-            ];
-
-            paylines.forEach(line => {
+            SLOT_PAYLINES.forEach(line => {
                 let firstSym = board[line[0][0]][line[0][1]];
 
                 let matchLen = 1;
@@ -1714,15 +2219,16 @@
                     }
                 }
 
-                if (firstSym.icon === "💎" && matchLen === 5) {
-                    gotFreeSpinsThisRound = true;
-                    matchedLineCells.forEach(c => winningCoords.add(`${c[0]},${c[1]}`));
-                } else if (firstSym.icon !== "💎" && matchLen >= 3 && matchLen <= 5) {
-                    let mult = firstSym.mult[matchLen];
-                    if (mult > 0) {
-                        let lineWin = Math.floor(bet * mult);
-                        totalWin += lineWin;
+                if (matchLen >= 3) {
+                    if (firstSym.icon === "💎" && matchLen === 5) {
+                        gotFreeSpinsThisRound = true;
                         matchedLineCells.forEach(c => winningCoords.add(`${c[0]},${c[1]}`));
+                    } else {
+                        let mult = firstSym.mult[matchLen];
+                        if (mult > 0) {
+                            totalWin += Math.floor(bet * mult);
+                            matchedLineCells.forEach(c => winningCoords.add(`${c[0]},${c[1]}`));
+                        }
                     }
                 }
             });
@@ -1752,10 +2258,11 @@
                         msg.innerHTML = `<span style="color: #00ff66; font-size: 16px; text-shadow: 0 0 10px #00ff66;">🌿 LINIEN-GEWINN: +${currentVal.toLocaleString()} Chips</span>`;
                     }
                 }, () => {
-                    casinoChips += totalWin;
+                    adjustChips(totalWin);
                     updateCasinoUI();
                     saveCasinoData();
                     updateFreeSpinsUI();
+                    endRound();
                 });
 
                 if (gambleBtn && !gotFreeSpinsThisRound) gambleBtn.classList.remove("hidden");
@@ -1767,6 +2274,7 @@
                 }
                 saveCasinoData();
                 updateFreeSpinsUI();
+                endRound();
             }
         }
 
@@ -1818,7 +2326,7 @@
         }
 
         function chooseGambleCard(choice) {
-            if (!checkSpamCooldown() || lastSlotWinAmount <= 0) return;
+            if (!checkSpamCooldown("gamble") || lastSlotWinAmount <= 0) return;
             const resDisplay = document.getElementById("gamble-result-display");
             const cardEl = document.getElementById("gamble-card-container");
 
@@ -1852,7 +2360,7 @@
 
         function collectGambleWin() {
             if (lastSlotWinAmount > 0) {
-                casinoChips += lastSlotWinAmount;
+                adjustChips(lastSlotWinAmount);
                 updateCasinoUI();
                 saveCasinoData();
                 playCasinoSound('claim');
@@ -1886,25 +2394,43 @@
         let bjDealerHand = [];
         let bjActiveBet = 0;
 
-        function startBlackjack() {
-            if (!checkSpamCooldown()) return;
+        async function startBlackjack() {
+            if (isGameBusy("blackjack")) return;
+            if (!checkSpamCooldown("blackjack")) return;
             const bet = parseInt(document.getElementById("bj-bet").value);
-            if (!validateBetAmount(bet)) return;
+            setGameBusy("blackjack", true);
+            try {
+                if (!await validateBetAmount(bet)) return;
+            } finally {
+                setGameBusy("blackjack", false);
+            }
             if (!checkChipsOrWarn(bet)) return;
 
             playCasinoSound('click');
             bjActiveBet = bet;
-            casinoChips -= bet;
+            beginRound(bet, "blackjack");
+            adjustChips(-bet);
             updateCasinoUI();
             recordRoundPlayed();
 
             bjDeck = createDeck();
-            if (Math.random() < 0.30) {
-                bjPlayerHand = [{val: '10', suit: '♠'}, {val: 'A', suit: '♥'}];
-                bjDealerHand = [{val: '9', suit: '♦'}, {val: '7', suit: '♣'}];
-            } else {
-                bjPlayerHand = [drawCard(), drawCard()];
-                bjDealerHand = [drawCard(), drawCard()];
+            bjPlayerHand = [drawCard(), drawCard()];
+            bjDealerHand = [drawCard(), drawCard()];
+
+            // Blackjack (Natural) zahlt 3:2, regulärer Gewinn 1:1
+            const pScore = calculateScore(bjPlayerHand);
+            const dScore = calculateScore(bjDealerHand);
+            const pIsBlackjack = pScore === 21 && bjPlayerHand.length === 2;
+            const dIsBlackjack = dScore === 21 && bjDealerHand.length === 2;
+
+            if (pIsBlackjack || dIsBlackjack) {
+                endBlackjack(
+                    pIsBlackjack && dIsBlackjack ? "BLACKJACK BEI DEALER - UNENTSCHIEDEN" :
+                    pIsBlackjack ? "BLACKJACK! 3:2 AUSGEZAHLT" : "DEALER HAT BLACKJACK",
+                    pIsBlackjack && dIsBlackjack ? "push" :
+                    pIsBlackjack ? "blackjack" : "loss"
+                );
+                return;
             }
 
             renderBlackjack(false);
@@ -1959,36 +2485,36 @@
         }
 
         function bjHit() {
-            if (!checkSpamCooldown()) return;
+            if (!checkSpamCooldown("blackjack")) return;
             document.getElementById("bj-double-btn").style.display = "none";
             bjPlayerHand.push(drawCard());
             renderBlackjack(false);
             if (calculateScore(bjPlayerHand) > 21) {
-                endBlackjack("Überkauft! Dealer gewinnt.");
+                endBlackjack("Überkauft! Dealer gewinnt.", "loss");
             }
         }
 
         function bjDoubleDown() {
-            if (!checkSpamCooldown() || casinoChips < bjActiveBet) return;
+            if (!checkSpamCooldown("blackjack") || casinoChips < bjActiveBet) return;
             if (bjActiveBet * 2 > casinoBetLimit) {
                 alert(`Einsatzlimit überschritten! Max erlaubt: ${casinoBetLimit}`);
                 return;
             }
-            casinoChips -= bjActiveBet;
+            adjustChips(-bjActiveBet);
             bjActiveBet *= 2;
             updateCasinoUI();
             bjPlayerHand.push(drawCard());
             renderBlackjack(false);
 
             if (calculateScore(bjPlayerHand) > 21) {
-                endBlackjack("Überkauft nach Verdopplung!");
+                endBlackjack("Überkauft! Dealer gewinnt.", "loss");
             } else {
                 bjStand();
             }
         }
 
         function bjStand() {
-            if (!checkSpamCooldown()) return;
+            if (!checkSpamCooldown("blackjack")) return;
             let dScore = calculateScore(bjDealerHand);
             while (dScore < 17) {
                 bjDealerHand.push(drawCard());
@@ -1997,31 +2523,52 @@
             renderBlackjack(true);
 
             let pScore = calculateScore(bjPlayerHand);
-            if (dScore <= 21 && dScore >= pScore) {
-                endBlackjack("Dealer gewinnt bei Gleichstand!");
-            } else if (dScore > 21 || pScore > dScore) {
-                endBlackjack("Glückwunsch! Du hast gewonnen!");
+            if (pScore > 21) {
+                endBlackjack("Überkauft! Dealer gewinnt.", "loss");
+            } else if (dScore > 21) {
+                endBlackjack("Dealer überkauft - Du gewinnst!", "win");
+            } else if (dScore > pScore) {
+                endBlackjack("Dealer gewinnt.", "loss");
+            } else if (dScore === pScore) {
+                endBlackjack("Gleichstand - Einsatz zurück.", "push");
             } else {
-                endBlackjack("Dealer gewinnt.");
+                endBlackjack("Glückwunsch! Du hast gewonnen!", "win");
             }
         }
 
-        function endBlackjack(msg) {
-            document.getElementById("bj-status-msg").textContent = msg;
-            if (msg.includes("gewonnen") || msg.includes("Blackjack")) {
-                let payout = Math.floor((bjActiveStrPayout(bjActiveBet)) * getRankBonusMultiplier());
-                casinoChips += payout;
-                playCasinoSound('win');
+        function endBlackjack(msg, outcome = "auto") {
+            const statusEl = document.getElementById("bj-status-msg");
+            if (statusEl) statusEl.textContent = msg;
+
+            let payout = 0;
+
+            if (outcome === "auto") {
+                const pScore = calculateScore(bjPlayerHand);
+                const dScore = calculateScore(bjDealerHand);
+                if (dScore > 21 || pScore > dScore) outcome = "win";
+                else if (dScore === pScore) outcome = "push";
+                else outcome = "loss";
+            }
+
+            if (outcome === "blackjack") {
+                payout = Math.floor(bjActiveBet * 2.5 * getRankBonusMultiplier());
+            } else if (outcome === "win") {
+                payout = Math.floor(bjActiveBet * 2 * getRankBonusMultiplier());
+            } else if (outcome === "push") {
+                payout = bjActiveBet;
+            }
+
+            if (payout > 0) {
+                adjustChips(payout);
+                playCasinoSound(outcome === "loss" ? 'lose' : 'win');
             } else {
                 playCasinoSound('lose');
             }
+
             saveCasinoData();
+            endRound();
             document.getElementById("bj-start-btn").style.display = "inline-block";
             document.getElementById("bj-actions").style.display = "none";
-        }
-
-        function bjActiveStrPayout(bet) {
-            return Math.floor(bet * 1.5);
         }
 
         const numbersOrder = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
@@ -2066,10 +2613,16 @@
             ctx.restore();
         }
 
-        function spinRouletteWheel() {
-            if (!checkSpamCooldown()) return;
+        async function spinRouletteWheel() {
+            if (isGameBusy("roulette")) return;
+            if (!checkSpamCooldown("roulette")) return;
             const bet = parseInt(document.getElementById("roulette-bet").value);
-            if (!validateBetAmount(bet)) return;
+            setGameBusy("roulette", true);
+            try {
+                if (!await validateBetAmount(bet)) return;
+            } finally {
+                setGameBusy("roulette", false);
+            }
 
             const choice = document.getElementById("roulette-choice").value;
             const resBox = document.getElementById("roulette-result-box");
@@ -2077,31 +2630,27 @@
 
             if (!checkChipsOrWarn(bet)) return;
 
-            casinoChips -= bet;
+            beginRound(bet, "roulette");
+            adjustChips(-bet);
             updateCasinoUI();
             playCasinoSound('click');
             spinBtn.disabled = true;
             recordRoundPlayed();
             resBox.textContent = "Kessel rotiert...";
 
-            let forceWin = Math.random() < 0.30;
-            let winningNum;
+            // Roulette: echte 37-Felder-Walze (europäisch), keine erzwungenen Gewinne.
+            // 18 Rot / 18 Schwarz / 1 Grün -> fairer Multiplikator 2.056x bzw. 37x
+            const winningNum = Math.floor(Math.random() * numbersOrder.length);
 
             const reds = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
-            const blacks = [2,4,6,8,10,11,13,15,17,20,22,24,26,28,29,31,33,35];
-
-            if (forceWin) {
-                if (choice === "red") winningNum = reds[Math.floor(Math.random() * reds.length)];
-                else if (choice === "black") winningNum = blacks[Math.floor(Math.random() * blacks.length)];
-                else winningNum = 0;
-            } else {
-                if (choice === "red") winningNum = blacks[Math.floor(Math.random() * blacks.length)];
-                else winningNum = reds[Math.floor(Math.random() * reds.length)];
-            }
 
             let targetIndex = numbersOrder.indexOf(winningNum);
             let sliceAngle = (2 * Math.PI) / numbersOrder.length;
-            let targetAngle = -targetIndex * sliceAngle - sliceAngle / 2 + Math.PI / 2 + (Math.PI * 2 * 6);
+            // Der Pointer sitzt oben (12 Uhr) = Bildschirmwinkel -PI/2 (Canvas-y
+            // waechst nach unten). Damit die Gewinnzahl unter dem Pointer steht,
+            // muss targetAngle = -PI/2 - targetIndex*sliceAngle - sliceAngle/2 sein.
+            // Mit +PI/2 stand die Zahl 180 Grad versetzt unter dem Zeiger.
+            let targetAngle = -targetIndex * sliceAngle - sliceAngle / 2 - Math.PI / 2 + (Math.PI * 2 * 6);
 
             let currentAngle = 0;
             let startTime = null;
@@ -2135,13 +2684,13 @@
             }
 
             let won = false;
-            let multiplier = 1.4;
-            if (choice === "green" && roll === 0) { won = true; multiplier = 5.0; }
-            else if (choice === color && roll !== 0) { won = true; multiplier = 1.4; }
+            let multiplier = 0;
+            if (choice === "green" && roll === 0) { won = true; multiplier = 35.0; }
+            else if (choice === color && roll !== 0) { won = true; multiplier = 1.95; }
 
             if (won) {
                 let win = Math.floor((bet * multiplier) * getRankBonusMultiplier());
-                casinoChips += win;
+                adjustChips(win);
                 playCasinoSound('win');
                 resBox.innerHTML = `<span style="color: #00ff66;">Treffer: ${roll} (${color.toUpperCase()}) - GEWONNEN +${win.toLocaleString()}!</span>`;
             } else {
@@ -2149,6 +2698,7 @@
                 resBox.innerHTML = `<span style="color: #ff0055;">Gefallen auf: ${roll} (${color.toUpperCase()}) - Verloren!</span>`;
             }
             saveCasinoData();
+            endRound();
         }
 
         let crashInterval = null;
@@ -2158,30 +2708,35 @@
         let crashRunning = false;
         let autoCashoutValue = 1.40;
 
-        function startCrash() {
-            if (!checkSpamCooldown()) return;
+        async function startCrash() {
+            if (isGameBusy("crash")) return;
+            if (!checkSpamCooldown("crash")) return;
             const bet = parseInt(document.getElementById("crash-bet").value);
-            if (!validateBetAmount(bet)) return;
+            setGameBusy("crash", true);
+            try {
+                if (!await validateBetAmount(bet)) return;
+            } finally {
+                setGameBusy("crash", false);
+            }
 
             autoCashoutValue = parseFloat(document.getElementById("crash-autocash").value) || 1.40;
             if (!checkChipsOrWarn(bet)) return;
 
             playCasinoSound('click');
             crashActiveBet = bet;
-            casinoChips -= bet;
+            beginRound(bet, "crash");
+            adjustChips(-bet);
             updateCasinoUI();
             recordRoundPlayed();
 
             crashRunning = true;
             currentMultiplier = 1.00;
 
-            let willWin = Math.random() < 0.30;
-            if (willWin) {
-                crashPoint = parseFloat((autoCashoutValue + (Math.random() * 0.8)).toFixed(2));
-            } else {
-                crashPoint = parseFloat((1.01 + (Math.random() * (autoCashoutValue - 1.01))).toFixed(2));
-                if (crashPoint < 1.01) crashPoint = 1.01;
-            }
+            // Crash-Punkt über die Standard-Verteilungsfunktion ziehen:
+            // P(Crash >= x) = 1/x  (Wert 1.00 => House Edge, Verteilung 1/x mit 3% Edge)
+            const HOUSE_EDGE = 0.03;
+            const rand = Math.random();
+            crashPoint = Math.max(1.01, Math.round(((1 - HOUSE_EDGE) / (1 - rand)) * 100) / 100);
 
             document.getElementById("crash-start-btn").classList.add("hidden");
             document.getElementById("crash-cashout-btn").classList.remove("hidden");
@@ -2198,11 +2753,6 @@
                     arrow.style.transform = `translate(${translateVal}px, -${translateVal}px) scale(${Math.min(scaleVal, 2.2)})`;
                 }
 
-                if (crashRunning && currentMultiplier >= autoCashoutValue && willWin) {
-                    cashoutCrash();
-                    return;
-                }
-
                 if (currentMultiplier >= crashPoint) {
                     clearInterval(crashInterval);
                     crashRunning = false;
@@ -2212,31 +2762,52 @@
                     document.getElementById("crash-start-btn").classList.remove("hidden");
                     document.getElementById("crash-cashout-btn").classList.add("hidden");
                     saveCasinoData();
+                    endRound();
+                    return;
+                }
+
+                if (crashRunning && currentMultiplier >= autoCashoutValue) {
+                    cashoutCrash();
+                    return;
                 }
             }, 65);
         }
 
-        function cashoutCrash() {
+        function cashoutCrash(multiplier = null) {
             if (!crashRunning) return;
             clearInterval(crashInterval);
             crashRunning = false;
 
-            let winnings = Math.floor(Math.floor(crashActiveBet * autoCashoutValue) * getRankBonusMultiplier());
-            casinoChips += winnings;
+            // Es wird immer der tatsaechlich erreichte Multiplikator ausgezahlt.
+            // Die Anzeige springt in 0.03-Schritten, der Auto-Cashout loest aber
+            // erst beim ersten Schritt >= Ziel aus (z.B. 1.42x statt 1.40x).
+            // Wuerde stattdessen der Zielwert ausgezahlt, wuerde die Anzeige vom
+            // Auszahlbetrag abweichen und die RTP sinken.
+            const finalMultiplier = currentMultiplier;
+
+            let winnings = Math.floor(Math.floor(crashActiveBet * finalMultiplier) * getRankBonusMultiplier());
+            adjustChips(winnings);
             saveCasinoData();
             playCasinoSound('win');
 
-            document.getElementById("crash-multiplier-display").innerHTML = `<span style="color:#00ff66;">CASH OUT! +${winnings.toLocaleString()} (${autoCashoutValue.toFixed(2)}x)</span>`;
+            document.getElementById("crash-multiplier-display").innerHTML = `<span style="color: #00ff66;">CASH OUT! +${winnings.toLocaleString()} (${finalMultiplier.toFixed(2)}x)</span>`;
             const arrow = document.getElementById("crash-arrow");
             if (arrow) arrow.style.transform = "translate(0, 0) scale(1)";
             document.getElementById("crash-start-btn").classList.remove("hidden");
             document.getElementById("crash-cashout-btn").classList.add("hidden");
+            endRound();
         }
 
-        function rollCyberDice() {
-            if (!checkSpamCooldown()) return;
+        async function rollCyberDice() {
+            if (isGameBusy("dice")) return;
+            if (!checkSpamCooldown("dice")) return;
             const bet = parseInt(document.getElementById("dice-bet").value);
-            if (!validateBetAmount(bet)) return;
+            setGameBusy("dice", true);
+            try {
+                if (!await validateBetAmount(bet)) return;
+            } finally {
+                setGameBusy("dice", false);
+            }
 
             const condition = document.getElementById("dice-cond").value;
             const disp = document.getElementById("dice-result-display");
@@ -2244,25 +2815,25 @@
 
             if (!checkChipsOrWarn(bet)) return;
 
-            casinoChips -= bet;
+            beginRound(bet, "dice");
+            adjustChips(-bet);
             updateCasinoUI();
             playCasinoSound('click');
             recordRoundPlayed();
 
-            let isWin = Math.random() < 0.30;
-            let roll = 50;
-
-            if (condition === "under") {
-                roll = isWin ? Math.floor(Math.random() * 29) + 1 : Math.floor(Math.random() * 70) + 31;
-            } else {
-                roll = isWin ? Math.floor(Math.random() * 30) + 71 : Math.floor(Math.random() * 70) + 1;
-            }
+            // Echter Würfelwurf 0-99, keine erzwungenen Gewinne.
+            // "Unter 29"  -> roll 0..28  = 29 Treffer  -> 29% * 3.30x = 95.7% RTP
+            // "Ab 70"     -> roll 70..99 = 30 Treffer  -> 30% * 3.20x = 96.0% RTP
+            // Die Auswahl im UI nennt exakt dieselben Schwellen und Chancen.
+            const roll = Math.floor(Math.random() * 100);
+            const isWin = (condition === "under") ? (roll < 29) : (roll >= 70);
 
             disp.textContent = `🎲 ${roll}`;
 
             if (isWin) {
-                let win = Math.floor((bet * 1.5) * getRankBonusMultiplier());
-                casinoChips += win;
+                const multiplier = (condition === "under") ? 3.30 : 3.20;
+                let win = Math.floor((bet * multiplier) * getRankBonusMultiplier());
+                adjustChips(win);
                 playCasinoSound('win');
                 msg.innerHTML = `<span style="color: #00ff66;">GEWONNEN! +${win.toLocaleString()} Chips</span>`;
             } else {
@@ -2270,7 +2841,12 @@
                 msg.innerHTML = `<span style="color: #ff0055;">VERLOREN!</span>`;
             }
             saveCasinoData();
+            endRound();
         }
+
+        // Faire Minefield-Multiplikatoren: 4 Minen auf 16 Feldern (12 sichere Felder)
+        // P(k sichere Felder) = C(12,k) / C(16,k)  ->  Multiplikator = 0.97 / P
+        const MINEFIELD_MULTIPLIERS = [1.00, 1.29, 1.76, 2.47, 3.56, 5.35, 8.40, 13.90, 25.20, 50.40, 117.70, 352.70, 1763.60];
 
         let mineActive = false;
         let mineBet = 0;
@@ -2290,14 +2866,21 @@
             }
         }
 
-        function startMinefield() {
-            if (!checkSpamCooldown()) return;
+        async function startMinefield() {
+            if (isGameBusy("minefield")) return;
+            if (!checkSpamCooldown("minefield")) return;
             const bet = parseInt(document.getElementById("mine-bet").value);
-            if (!validateBetAmount(bet)) return;
+            setGameBusy("minefield", true);
+            try {
+                if (!await validateBetAmount(bet)) return;
+            } finally {
+                setGameBusy("minefield", false);
+            }
 
             if (!checkChipsOrWarn(bet)) return;
 
-            casinoChips -= bet;
+            beginRound(bet, "minefield");
+            adjustChips(-bet);
             updateCasinoUI();
             playCasinoSound('click');
             recordRoundPlayed();
@@ -2330,7 +2913,7 @@
 
         function clickMineTile(index, tile) {
             if (!mineActive || tile.classList.contains("revealed")) return;
-            if (!checkSpamCooldown()) return;
+            if (!checkSpamCooldown("minefield")) return;
 
             tile.classList.add("revealed");
 
@@ -2344,12 +2927,13 @@
                 document.getElementById("mine-start-btn").classList.remove("hidden");
                 document.getElementById("mine-cashout-btn").classList.add("hidden");
                 saveCasinoData();
+                endRound();
             } else {
                 tile.innerHTML = "✨";
                 tile.style.borderColor = "#00ff66";
                 playCasinoSound('win');
                 revealedCount++;
-                mineMultiplier = parseFloat((mineMultiplier + 0.20).toFixed(2));
+                mineMultiplier = MINEFIELD_MULTIPLIERS[Math.min(revealedCount, MINEFIELD_MULTIPLIERS.length - 1)];
                 document.getElementById("mine-status").textContent = `Multiplikator: ${mineMultiplier}x`;
             }
         }
@@ -2358,12 +2942,13 @@
             if (!mineActive) return;
             mineActive = false;
             let win = Math.floor(Math.floor(mineBet * mineMultiplier) * getRankBonusMultiplier());
-            casinoChips += win;
+            adjustChips(win);
             playCasinoSound('win');
             document.getElementById("mine-status").innerHTML = `<span style="color:#00ff66;">GESICHERT! +${win.toLocaleString()} Chips (${mineMultiplier}x)</span>`;
             document.getElementById("mine-start-btn").classList.remove("hidden");
             document.getElementById("mine-cashout-btn").classList.add("hidden");
             saveCasinoData();
+            endRound();
         }
 
         async function loadCasinoLeaderboard() {

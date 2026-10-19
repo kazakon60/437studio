@@ -398,6 +398,7 @@
         <ul class="nav-links">
             <li><a href="index.html"><i class="fas fa-home"></i> Home</a></li>
             <li><a href="forum.html"><i class="fas fa-comments"></i> Forum</a></li>
+            <li><a href="messages.html"><i class="fas fa-envelope"></i> Nachrichten</a></li>
             <li><a href="games.html"><i class="fas fa-gamepad"></i> Games</a></li>
             <li><a href="mitglieder.html" class="active"><i class="fas fa-users"></i> Mitglieder</a></li>
             <li><a href="music.html"><i class="fas fa-music"></i> Musik</a></li>
@@ -471,6 +472,7 @@
 
     <!-- Globale Core Engine Skripte -->
     <script src="js/app.js"></script>
+    
     <script>
         let allMembersData = [];
 
@@ -574,6 +576,17 @@
             if (!client) return;
 
             if (currentUser && currentUser.username) {
+                try {
+                    const { data: u } = await client
+                        .from("users")
+                        .select("is_admin")
+                        .ilike("username", currentUser.username)
+                        .maybeSingle();
+                    if (u) {
+                        currentUser.is_admin = u.is_admin === true;
+                        localStorage.setItem("437_session", JSON.stringify(currentUser));
+                    }
+                } catch (e) {}
                 if (typeof isAdmin === "function" && isAdmin(currentUser)) {
                     const indicator = document.getElementById("admin-status-indicator");
                     if (indicator) indicator.classList.remove("hidden");
@@ -785,6 +798,11 @@
                     if (error) {
                         showCyberAlert("Fehler", "❌ Fehler: " + error.message, "danger");
                         return;
+                    }
+
+                    if (currentUser && normalizeUsername(currentUser.username) === normalizeUsername(username)) {
+                        currentUser.is_admin = newAdminStatus;
+                        localStorage.setItem("437_session", JSON.stringify(currentUser));
                     }
 
                     showCyberAlert("Erfolg", `✅ Benutzer '${username}' wurde erfolgreich aktualisiert.`, "success");

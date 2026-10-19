@@ -1,89 +1,65 @@
 /* ==========================================
 
-   437 STUDIO | CORE STYLES & RESET
+   437 STUDIO | CORE STYLES & RESET (OPTIMIZED)
 
    ========================================== */
 
 * {
-
     margin: 0;
-
     padding: 0;
-
     box-sizing: border-box;
-
     font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
 
+:root {
+    --neon-blue: #00f0ff;
+    --neon-pink: #ff007f;
+    --neon-green: #00ff66;
+    --bg-dark: #030308;
+    --text-main: #fff;
+    --text-muted: #aaa;
 }
 
 html, body {
-
     max-width: 100vw;
-
     overflow-x: hidden;
-
     background-color: #05050a;
-
     color: #ffffff;
-
     min-height: 100vh;
-
     position: relative;
-
 }
 
 /* Neon Gitter-Hintergrundeffekt */
 
 .grid-overlay {
-
     position: fixed;
-
     top: 0;
-
     left: 0;
-
     width: 100vw;
-
     height: 100vh;
-
     background-image:
-
         linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
-
         linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-
     background-size: 100% 4px, 6px 100%;
-
     z-index: 999;
-
     pointer-events: none;
-
 }
 
 /* --- NEON UTILITIES --- */
 
 .neon-text-pink {
-
     color: #ff007f;
-
     text-shadow: 0 0 5px #ff007f, 0 0 15px #ff007f, 0 0 30px #ff007f;
-
 }
 
 .neon-text-green {
-
     color: #00ff66;
-
     text-shadow: 0 0 5px #00ff66, 0 0 15px #00ff66, 0 0 30px #00ff66;
-
 }
 
 .neon-text-blue {
-
     color: #00f0ff;
-
     text-shadow: 0 0 5px #00f0ff, 0 0 15px #00f0ff, 0 0 30px #00f0ff;
-
 }
 
 .hidden { display: none !important; }

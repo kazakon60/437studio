@@ -168,7 +168,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
     initialize437Studio();
-    injectPushSettingsModalDOM(); // Garantiert, dass das Modal immer vorhanden ist
 });
 
 // ========================================================================
@@ -177,6 +176,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function initialize437Studio() {
     checkActiveSession();
+    refreshAdminStatus();
     updateNavbarAuthUI();
     checkGlobalMaintenanceState();
     injectGlobalTickerBar();
@@ -187,23 +187,25 @@ function initialize437Studio() {
     checkUnreadMessagesOnLoad();
     checkUserTimeoutState();
 
-    // Globale Aktivitäts-Überwachung (Heartbeat alle 30 Sek. für Online-Status auf allen Seiten)
     updateMyOnlineActivity();
     setInterval(() => {
         updateMyOnlineActivity();
     }, 30000);
 }
 
+let _lastOnlineUpdate = 0;
+
 async function updateMyOnlineActivity() {
     if (!supabaseClient || !currentUser || !currentUser.username) return;
+    const now = Date.now();
+    if (now - _lastOnlineUpdate < 15000) return;
+    _lastOnlineUpdate = now;
     try {
         await supabaseClient
             .from("users")
             .update({ last_active_at: new Date().toISOString() })
             .ilike("username", currentUser.username);
-    } catch (e) {
-        // Stille im Hintergrund halten
-    }
+    } catch (e) {}
 }
 
 function showMessageBadge() {
@@ -441,7 +443,6 @@ function applyTimeoutBlockers(reasonMessage) {
                     </div>
                 </div>
             `;
-            form.innerHTML = "";
             form.appendChild(overlay);
         }
     });
@@ -509,6 +510,21 @@ function saveLocalSession() {
     localStorage.setItem("437_session", JSON.stringify(currentUser));
 }
 
+async function refreshAdminStatus() {
+    if (!supabaseClient || !currentUser || !currentUser.username) return;
+    try {
+        const { data } = await supabaseClient
+            .from("users")
+            .select("is_admin")
+            .ilike("username", currentUser.username)
+            .maybeSingle();
+        if (data) {
+            currentUser.is_admin = data.is_admin === true;
+            localStorage.setItem("437_session", JSON.stringify(currentUser));
+        }
+    } catch (e) {}
+}
+
 function updateNavbarAuthUI() {
     const loggedOutZone = getElement("logged-out-zone");
     const loggedInZone = getElement("logged-in-zone");
@@ -553,7 +569,7 @@ function updateNavbarAuthUI() {
 }
 
 // ========================================================================
-// 5. PROFIL-DROPDOWN
+// 5. PROFIL-DROPDOWN (VERWEIS AUF SETTINGS.HTML / SETTINGS.JS)
 // ========================================================================
 
 function buildProfileDropdown() {
@@ -566,18 +582,10 @@ function buildProfileDropdown() {
             <span>Profil Matrix</span>
         </a>
 
-        <a href="messages.html" class="profile-dropdown-messages" style="display: flex; align-items: center; justify-content: space-between;">
-            <span style="display: flex; align-items: center; gap: 8px;">
-                <i class="fas fa-envelope"></i>
-                <span>Nachrichten</span>
-            </span>
-            <span id="dropdown-msg-badge" class="hidden" style="width: 8px; height: 8px; background: #ff0055; border-radius: 50%; box-shadow: 0 0 6px #ff0055;"></span>
-        </a>
-
-        <!-- Button zum Öffnen des Push-Modals im Dropdown -->
-        <a href="#" onclick="openPushSettingsModal(); return false;" style="display: flex; align-items: center; gap: 8px; color: var(--neon-blue);">
-            <i class="fas fa-bell"></i>
-            <span>Push-Einstellungen</span>
+        <!-- Verweis auf die separate Einstellungen-Seite / settings.html -->
+        <a href="settings.html" style="display: flex; align-items: center; gap: 8px; color: var(--neon-blue);">
+            <i class="fas fa-sliders-h"></i>
+            <span>Einstellungen</span>
         </a>
 
         ${isAdmin() ? `
@@ -585,6 +593,11 @@ function buildProfileDropdown() {
                 <i class="fas fa-shield-alt"></i>
                 <span>Control Panel</span>
             </a>
+
+            <button id="maintenance-toggle-btn" class="profile-dropdown-admin" style="background: transparent; border: none; width: 100%; text-align: left; padding: 10px 15px; color: #ff007f; font-family: inherit; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 10px;" onclick="toggleMaintenanceMode()">
+                <i class="fas fa-${isGlobalMaintenanceActive ? 'toggle-on' : 'toggle-off'}" style="width: 20px;"></i>
+                <span>Wartungsmodus: ${isGlobalMaintenanceActive ? 'EIN' : 'AUS'}</span>
+            </button>
         ` : ""}
 
         <hr>
@@ -1121,9 +1134,17 @@ function applyMaintenanceBlockers() {
         }
     }
 
+    const settingsContainer = document.querySelector(".settings-container");
+    if (settingsContainer) {
+        const blocker = settingsContainer.querySelector("#settings-maintenance-blocker");
+        if (blocker) {
+            blocker.classList.add("cyber-maintenance-overlay");
+            blocker.classList.remove("hidden");
+        }
+    }
+
     const forumContainer = document.getElementById("forum-threads-container");
-    if (forumContainer) {
-        const forumHeaderBtn = document.querySelector("main button[onclick*='openCreateDiscussionModal']");
+    if (forumContainer) {        const forumHeaderBtn = document.querySelector("main button[onclick*='openCreateDiscussionModal']");
         if (forumHeaderBtn) {
             forumHeaderBtn.disabled = true;
             forumHeaderBtn.style.opacity = "0.35";
@@ -1175,9 +1196,87 @@ function applyMaintenanceBlockers() {
     }
 }
 
+function showCyberAlert(title, text, type = "info") {
+    document.getElementById("custom-cyber-alert")?.remove();
+
+    const borderColor = type === "danger" ? "#ff007f" : (type === "success" ? "#00ff66" : "#00f0ff");
+    const glowColor = type === "danger" ? "rgba(255, 0, 127, 0.4)" : (type === "success" ? "rgba(0, 255, 102, 0.4)" : "rgba(0, 240, 255, 0.4)");
+
+    const alertBox = document.createElement("div");
+    alertBox.id = "custom-cyber-alert";
+    alertBox.style.cssText = `
+        position: fixed; inset: 0; background: rgba(3, 3, 10, 0.85);
+        display: flex; align-items: center; justify-content: center; z-index: 999999;
+        backdrop-filter: blur(8px); font-family: monospace;
+    `;
+
+    alertBox.innerHTML = `
+        <div style="background: linear-gradient(135deg, #0c0c18 0%, #160a2a 100%); border: 2px solid ${borderColor}; border-radius: 12px; padding: 30px; max-width: 380px; width: 90%; text-align: center; box-shadow: 0 0 40px ${glowColor}; color: #fff;">
+            <div style="font-size: 36px; color: ${borderColor}; margin-bottom: 12px;">
+                <i class="fas ${type === 'danger' ? 'fa-exclamation-triangle' : (type === 'success' ? 'fa-check-circle' : 'fa-info-circle')}"></i>
+            </div>
+            <h3 style="color: ${borderColor}; font-size: 15px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">${title}</h3>
+            <p style="color: #ccc; font-size: 12px; line-height: 1.5; margin-bottom: 20px;">${text}</p>
+            <button id="cyber-alert-ok-btn" style="background: ${borderColor}; color: #030308; border: none; padding: 10px 20px; font-weight: bold; font-family: monospace; border-radius: 6px; cursor: pointer; width: 100%; text-transform: uppercase;">OK</button>
+        </div>
+    `;
+
+    document.body.appendChild(alertBox);
+
+    document.getElementById("cyber-alert-ok-btn").addEventListener("click", () => {
+        alertBox.remove();
+    });
+}
+
+async function toggleMaintenanceMode() {
+    if (!isAdmin()) return;
+    if (!supabaseClient || !currentUser) return;
+
+    const newState = !isGlobalMaintenanceActive;
+
+    try {
+        const { error } = await supabaseClient
+            .from("maintenance")
+            .update({ active: newState })
+            .eq("id", 1);
+
+        if (error) throw error;
+
+        isGlobalMaintenanceActive = newState;
+
+        if (newState) {
+            document.body.classList.add("maintenance-active");
+            prependMaintenanceBanner();
+            applyMaintenanceBlockers();
+        } else {
+            document.body.classList.remove("maintenance-active");
+            getElement("maintenance-alert-banner")?.remove();
+            removeMaintenanceBlockers();
+        }
+
+        showCyberAlert("Wartungsmodus", newState ? "🔒 Wartungsmodus aktiviert." : "🔓 Wartungsmodus deaktiviert.", newState ? "danger" : "success");
+
+        const btn = document.getElementById("maintenance-toggle-btn");
+        if (btn) {
+            btn.innerHTML = `
+                <i class="fas fa-${newState ? 'toggle-on' : 'toggle-off'}" style="width: 20px;"></i>
+                <span>Wartungsmodus: ${newState ? 'EIN' : 'AUS'}</span>
+            `;
+        }
+
+        setTimeout(() => window.location.reload(), 800);
+    } catch (err) {
+        console.error("Fehler beim Umschalten des Wartungsmodus:", err);
+        showCyberAlert("Fehler", "❌ Wartungsmodus konnte nicht umgeschaltet werden.", "danger");
+    }
+}
+
 function removeMaintenanceBlockers() {
     document.getElementById("maintenance-msg-blocker")?.remove();
     document.getElementById("maintenance-forum-notice")?.remove();
+
+    const settingsBlocker = document.getElementById("settings-maintenance-blocker");
+    if (settingsBlocker) settingsBlocker.classList.add("hidden");
 
     const forumHeaderBtn = document.querySelector("main button[onclick*='openCreateDiscussionModal']");
     if (forumHeaderBtn) {
@@ -1247,8 +1346,73 @@ function injectGlobalTickerBar() {
 }
 
 // ========================================================================
-// 10. ACHIEVEMENTS
+// 10. ACHIEVEMENTS & MEILENSTEINE (INKL. CASINO CHIPS FÜR LEVEL 5-30)
 // ========================================================================
+
+let playerAchievements = {
+    unlockedLevels: [],
+    milestonesClaimed: []
+};
+
+async function checkAndAwardMilestone(completedLevel) {
+    const milestoneRewards = {
+        5: 500,
+        10: 1000,
+        15: 15000,
+        20: 2000,
+        25: 25000,
+        30: 3000
+    };
+
+    if (milestoneRewards[completedLevel]) {
+        if (!playerAchievements.milestonesClaimed.includes(completedLevel)) {
+            playerAchievements.milestonesClaimed.push(completedLevel);
+            
+            let rewardChips = milestoneRewards[completedLevel];
+            
+            if (typeof gameCredits !== 'undefined') {
+                gameCredits += rewardChips;
+            } else if (typeof currentUser !== 'undefined' && currentUser) {
+                currentUser.coins = (currentUser.coins || 0) + rewardChips;
+            }
+
+            await saveAchievementsToSupabase();
+            return rewardChips;
+        }
+    }
+    return 0;
+}
+
+async function saveAchievementsToSupabase() {
+    let activeUsername = null;
+    if (typeof currentUser !== 'undefined' && currentUser && currentUser.username) {
+        activeUsername = currentUser.username;
+        currentUser.achievements = playerAchievements;
+        localStorage.setItem("437_session", JSON.stringify(currentUser));
+    } else {
+        const stored = localStorage.getItem("437_session");
+        if (stored) {
+            const p = JSON.parse(stored);
+            activeUsername = p.username;
+            p.achievements = playerAchievements;
+            localStorage.setItem("437_session", JSON.stringify(p));
+        }
+    }
+
+    if (activeUsername && typeof supabaseClient !== 'undefined' && supabaseClient) {
+        try {
+            await supabaseClient
+                .from("users")
+                .update({ 
+                    coins: typeof gameCredits !== 'undefined' ? gameCredits : currentUser.coins,
+                    achievements: playerAchievements 
+                })
+                .ilike("username", activeUsername);
+        } catch (err) {
+            console.error("Fehler beim Speichern der Erfolge in Supabase:", err);
+        }
+    }
+}
 
 async function unlockAchievement(key) {
     if (!currentUser || !ACHIEVEMENTS_LIST[key]) return;
@@ -1692,190 +1856,18 @@ function triggerNativeNotification(title, body, url) {
     }
 }
 
-// ========================================================================
-// 13. PUSH BENACHRICHTIGUNGEN & SERVICE WORKER (CYBER MODAL INJIZIERUNG)
-// ========================================================================
-
-// ========================================================================
-// PUSH-BENACHRICHTIGUNGEN & CYBER MODAL (VOLL KONTROLLIERBAR)
-// ========================================================================
-
-function injectPushSettingsModalDOM() {
-    if (document.getElementById("pushSettingsModal")) return;
-
-    const modalHTML = `
-        <div id="pushSettingsModal" class="cyber-push-modal hidden" style="position: fixed; inset: 0; background: rgba(3, 3, 10, 0.85); display: flex; align-items: center; justify-content: center; z-index: 999999; backdrop-filter: blur(8px);">
-            <div id="pushModalBoxInner" class="cyber-push-box" style="background: linear-gradient(135deg, #0c0c18 0%, #160a2a 100%); border: 2px solid #00f0ff; border-radius: 12px; padding: 30px; max-width: 420px; width: 90%; text-align: center; box-shadow: 0 0 40px rgba(0, 240, 255, 0.35); font-family: monospace; color: #fff;">
-                <div id="pushModalIcon" style="font-size: 42px; color: #00f0ff; margin-bottom: 12px; text-shadow: 0 0 15px rgba(0,240,255,0.6);">
-                    <i class="fas fa-satellite-dish"></i>
-                </div>
-                <h2 id="pushModalTitle" style="color: #00f0ff; font-size: 16px; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Push-Benachrichtigungen</h2>
-                <p id="pushModalText" style="color: #ccc; font-size: 12px; line-height: 1.5; margin-bottom: 20px;">
-                    Verwalte den Status deines Netzwerks für Echtzeit-Nachrichten und Foren-Updates auf PC & Handy.
-                </p>
-                <div style="display: flex; gap: 10px;">
-                    <button onclick="togglePushSystemState()" id="pushActionBtn" class="btn btn-neon-blue" style="flex: 1; padding: 10px; font-size: 12px; cursor: pointer; font-weight: bold; border-radius: 6px;">
-                        <i class="fas fa-power-off"></i> Umschalten
-                    </button>
-                    <button onclick="closePushSettingsModal()" class="btn" style="flex: 1; padding: 10px; font-size: 11px; background: rgba(255,255,255,0.05); border: 1px solid #555; color: #aaa; cursor: pointer; border-radius: 6px;">
-                        Schließen
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML("beforeend", modalHTML);
-}
-
-function openPushSettingsModal() {
-    closeProfileDropdown();
-    const modal = document.getElementById("pushSettingsModal");
-    if (!modal) return;
-    updatePushModalUI();
-    modal.classList.remove("hidden");
-}
-
-function closePushSettingsModal() {
-    const modal = document.getElementById("pushSettingsModal");
-    if (modal) modal.classList.add("hidden");
-}
-
-function updatePushModalUI() {
-    const boxInner = document.getElementById("pushModalBoxInner");
-    const iconEl = document.getElementById("pushModalIcon");
-    const titleEl = document.getElementById("pushModalTitle");
-    const textEl = document.getElementById("pushModalText");
-    const btnEl = document.getElementById("pushActionBtn");
-
-    if (!boxInner || !('Notification' in window)) return;
-
-    // Prüfen, ob der Nutzer es lokal deaktiviert hat
-    const isLocallyDisabled = localStorage.getItem("437_push_disabled") === "true";
-
-    if (Notification.permission === 'granted' && !isLocallyDisabled) {
-        boxInner.style.borderColor = "#00ff66";
-        boxInner.style.boxShadow = "0 0 40px rgba(0, 255, 102, 0.35)";
-        if (iconEl) { iconEl.className = "fas fa-bell"; iconEl.style.color = "#00ff66"; }
-        if (titleEl) { titleEl.textContent = "Status: Aktiviert"; titleEl.style.color = "#00ff66"; }
-        if (textEl) textEl.textContent = "Dein Gerät empfängt Live-Nachrichten und Foren-Updates über das 437 Studio Netzwerk.";
-        
-        if (btnEl) {
-            btnEl.innerHTML = '<i class="fas fa-ban"></i> Deaktivieren';
-            btnEl.style.background = "rgba(255, 0, 127, 0.2)";
-            btnEl.style.border = "1px solid #ff007f";
-            btnEl.style.color = "#ff007f";
-            btnEl.disabled = false;
-            btnEl.style.opacity = "1";
-        }
-    } else {
-        boxInner.style.borderColor = "#ff007f";
-        boxInner.style.boxShadow = "0 0 40px rgba(255, 0, 127, 0.35)";
-        if (iconEl) { iconEl.className = "fas fa-bell-slash"; iconEl.style.color = "#ff007f"; }
-        if (titleEl) { titleEl.textContent = "Status: Deaktiviert"; titleEl.style.color = "#ff007f"; }
-        if (textEl) textEl.textContent = "Aktiviere die Benachrichtigungen, um keine Nachrichten oder Foren-Updates zu verpassen.";
-        
-        if (btnEl) {
-            btnEl.innerHTML = '<i class="fas fa-check"></i> Jetzt aktivieren';
-            btnEl.style.background = "";
-            btnEl.style.border = "";
-            btnEl.style.color = "";
-            btnEl.disabled = false;
-            btnEl.style.opacity = "1";
-        }
-    }
-}
-
-async function togglePushSystemState() {
-    if (!('Notification' in window)) return;
-
-    const isLocallyDisabled = localStorage.getItem("437_push_disabled") === "true";
-
-    if (Notification.permission === 'granted' && !isLocallyDisabled) {
-        // --- DEAKTIVIEREN ---
-        try {
-            // Merken, dass der Nutzer Push deaktiviert hat
-            localStorage.setItem("437_push_disabled", "true");
-
-            if ('serviceWorker' in navigator) {
-                const registration = await navigator.serviceWorker.ready;
-                const subscription = await registration.pushManager.getSubscription();
-                if (subscription) {
-                    await subscription.unsubscribe();
-                }
-            }
-            if (supabaseClient && currentUser && currentUser.username) {
-                await supabaseClient.from("push_subscriptions").delete().eq("username", currentUser.username);
-            }
-        } catch (e) {
-            console.error("Fehler beim Deaktivieren des Push-Dienstes:", e);
-        }
-
-        alert("Push-Dienst für deinen Account erfolgreich getrennt.");
-        closePushSettingsModal();
-        updatePushModalUI();
-    } else {
-        // --- AKTIVIEREN ---
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-            // Sperre wieder aufheben
-            localStorage.removeItem("437_push_disabled");
-
-            const registration = await navigator.serviceWorker.ready;
-            await subscribeUserToPush(registration);
-            updatePushModalUI();
-        } else {
-            alert("❌ Berechtigung für Benachrichtigungen wurde abgelehnt.");
-            updatePushModalUI();
-        }
-    }
-}
-
 async function registerServiceWorkerForPush() {
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
+    if ('serviceWorker' in navigator) {
         try {
-            const registration = await navigator.serviceWorker.register('/sw.js');
-            if (Notification.permission === 'granted' && VAPID_PUBLIC_KEY) {
-                await subscribeUserToPush(registration);
-            }
+            await navigator.serviceWorker.register('/sw.js');
         } catch (error) {
-            console.warn('Push-Registrierung fehlgeschlagen:', error);
+            console.warn('Service Worker Registrierung fehlgeschlagen:', error);
         }
     }
-}
-
-async function subscribeUserToPush(registration) {
-    try {
-        let subscription = await registration.pushManager.getSubscription();
-        if (!subscription) {
-            subscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
-            });
-        }
-        if (supabaseClient && currentUser && currentUser.username) {
-            await supabaseClient.from("push_subscriptions").upsert({
-                username: currentUser.username,
-                subscription: subscription
-            }, { onConflict: "username" });
-        }
-    } catch (error) {
-        console.error("Fehler beim Abonnieren des Push-Dienstes:", error);
-    }
-}
-
-function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
 }
 
 // ========================================================================
-// 14. UI FEEDBACK & LOADING WRAPPER
+// 13. UI FEEDBACK & LOADING WRAPPER
 // ========================================================================
 
 async function executeWithLoading(buttonElement, loadingText, asyncAction) {
@@ -1941,7 +1933,7 @@ async function adminDeleteComment(commentId, buttonElement) {
 }
 
 // ========================================================================
-// 15. GLOBALE EXPORTE & EVENT-LISTENERS
+// 14. GLOBALE EXPORTE & EVENT-LISTENERS
 // ========================================================================
 
 window.toggleProfileDropdown = toggleProfileDropdown;
@@ -1961,11 +1953,9 @@ window.previewGalleryImage = previewGalleryImage;
 window.populatePerkSelectDropdowns = populatePerkSelectDropdowns;
 window.updateCharCardPreview = updateCharCardPreview;
 window.saveProfileChanges = saveProfileChanges;
-window.openPushSettingsModal = openPushSettingsModal;
-window.closePushSettingsModal = closePushSettingsModal;
-window.togglePushSystemState = togglePushSystemState;
 window.adminDeleteComment = adminDeleteComment;
 window.clearMessageBadge = clearMessageBadge;
+window.checkAndAwardMilestone = checkAndAwardMilestone;
 
 setInterval(() => {
     if (typeof loadAllThreads === "function" && document.visibilityState === "visible") {

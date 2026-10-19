@@ -50,7 +50,12 @@ self.addEventListener("push", event => {
     );
 });
 
-// Klick auf das Benachrichtigungs-Fenster
+// Fetch-Handler (notwendig für PWA-Installation, z.B. auf iOS)
+self.addEventListener("fetch", event => {
+    event.respondWith(
+        fetch(event.request).catch(() => caches.match(event.request)).then(r => r || new Response("", { status: 503 }))
+    );
+});
 self.addEventListener("notificationclick", event => {
     event.notification.close();
 

@@ -1,19 +1,14 @@
-// =========================================================================
-// 437 STUDIO | DIRECT MESSAGES, CHANNELS & SETTINGS ENGINE 
-// VERSION: 5.7.0-ULTRA (FULL ADMIN & CHANNEL SUITE)
-// =========================================================================
-
 "use strict";
 
 let activeChatPartner = localStorage.getItem("437_active_chat_partner") || null;
 let activeChannel = null;
 let currentViewMode = "private";
-let sendAsStudio = false; 
+let sendAsStudio = false;
 
 let attachedMessageImage = null;
 let attachedMessageVideo = null;
 let recordedAudioBase64 = null;
-let channelBannerBase64 = null; 
+let channelBannerBase64 = null;
 let settingsChannelBannerBase64 = null;
 let searchTimeout = null;
 let messagesSubscription = null;
@@ -28,9 +23,15 @@ let isRecordingCancelled = false;
 let renderedMessageIds = new Set();
 let hiddenChats = JSON.parse(localStorage.getItem("437_hidden_chats") || "[]");
 let userAvatarCache = new Map();
+let performanceMonitor = {
+    init: Date.now(),
+    renderCount: 0,
+    batchCount: 0,
+    lastCleanup: Date.now()
+};
 
 // =========================================================================
-// 1. INITIALISIERUNG BEIM LADEN DES DOMS (WARTET AUF CURRENTUSER)
+// 1. INITIALISIERUNG BEIM LADEN DES DOMS
 // =========================================================================
 document.addEventListener("DOMContentLoaded", () => {
     let checkAttempts = 0;
@@ -72,32 +73,52 @@ document.addEventListener("DOMContentLoaded", () => {
                 window.location.href = "index.html";
             }
         }
-    }, 100);
+    }, 50);
 });
 
-// =========================================================================
-// 2. EVENT LISTENER & UI HOOKS INITIALISIERUNG
-// =========================================================================
 function initMessageEventListeners() {
+    const listeners = [];
+    
     const textInput = document.getElementById("msg-text-input");
     if (textInput) {
-        textInput.addEventListener("keydown", (e) => {
+        const textHandler = (e) => {
             if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 handleSendPrivateMessage(e);
             }
-        });
+        };
+        textInput.addEventListener("keydown", textHandler);
+        listeners.push({ element: textInput, event: "keydown", handler: textHandler });
     }
 
     const searchInput = document.getElementById("recipient-search-input");
     if (searchInput) {
-        searchInput.addEventListener("input", handleUserSearchInput);
+        const searchHandler = (e) => {
+            if (searchTimeout) clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(handleUserSearchInput, 300, e);
+        };
+        searchInput.addEventListener("input", searchHandler);
+        listeners.push({ element: searchInput, event: "input", handler: searchHandler });
+    }
+    
+    window.messageSystemListeners = window.messageSystemListeners || [];
+    window.messageSystemListeners.push(...listeners);
+}
+
+function openImageZoomModal(imgSrc) {
+    const modal = document.getElementById("cyber-image-zoom-modal");
+    const zoomImg = document.getElementById("zoom-modal-img");
+    if (modal && zoomImg) {
+        zoomImg.src = imgSrc;
+        modal.style.display = "flex";
     }
 }
 
-// =========================================================================
-// 3. INDIVIDUELLES DESIGN- & HINTERGRUND-SYSTEM (PRO CHAT / CHANNEL)
-// =========================================================================
+function closeImageZoomModal() {
+    const modal = document.getElementById("cyber-image-zoom-modal");
+    if (modal) modal.style.display = "none";
+}
+
 function getActiveChatStorageKey() {
     if (activeChannel) return `437_chat_bg_channel_${activeChannel.toLowerCase()}`;
     if (activeChatPartner) return `437_chat_bg_private_${activeChatPartner.toLowerCase()}`;
@@ -207,7 +228,7 @@ function closeChatDesignModal() {
 }
 
 // =========================================================================
-// 4. HILFSFUNKTION: ADMIN-PRÜFUNG & DATUM/UHRZEIT FORMATIERUNG
+// 5. HILFSFUNKTION: ADMIN-PRÜFUNG & DATUM/UHRZEIT FORMATIERUNG
 // =========================================================================
 function checkIsUserAdmin() {
     if (!currentUser) return false;
@@ -241,23 +262,23 @@ function formatMessageTimestamp(timestampString) {
 }
 
 async function getAvatarForUser(username) {
-    if (!username) return DEFAULT_AVATAR;
+    if (!username) return typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "/img/logo.png";
     const uLower = username.toLowerCase();
     if (uLower === "437 studio") return "/img/logo.png";
     if (userAvatarCache.has(uLower)) return userAvatarCache.get(uLower);
 
     try {
         const { data } = await supabaseClient.from("users").select("avatar").ilike("username", username).maybeSingle();
-        const avatar = (data && data.avatar) ? data.avatar : DEFAULT_AVATAR;
+        const avatar = (data && data.avatar) ? data.avatar : (typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "/img/logo.png");
         userAvatarCache.set(uLower, avatar);
         return avatar;
     } catch (e) {
-        return DEFAULT_AVATAR;
+        return typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "/img/logo.png";
     }
 }
 
 // =========================================================================
-// 5. DEFAULT CHANNELS VERIFIZIERUNG & ERSTELLUNG
+// 6. DEFAULT CHANNELS VERIFIZIERUNG & ERSTELLUNG
 // =========================================================================
 async function verifyAndInitDefaultChannels() {
     if (!supabaseClient || !currentUser) return;
@@ -297,9 +318,6 @@ async function verifyAndInitDefaultChannels() {
     }
 }
 
-// =========================================================================
-// 6. TAB UMSCHALTUNG (PRIVATE VS CHANNELS)
-// =========================================================================
 function switchMessageTab(mode) {
     currentViewMode = mode;
     const privateList = document.getElementById("recent-chats-list");
@@ -308,22 +326,31 @@ function switchMessageTab(mode) {
     const chanBtn = document.getElementById("tab-channels-btn");
 
     if (mode === "private") {
-        if (privateList) { privateList.style.display = "flex"; privateList.classList.remove("hidden"); }
-        if (channelsList) { channelsList.style.display = "none"; channelsList.classList.add("hidden"); }
-        if (privBtn) { privBtn.className = "sidebar-tab-btn active"; }
-        if (chanBtn) { chanBtn.className = "sidebar-tab-btn"; }
+        if (privateList) {
+            privateList.style.display = "flex";
+            privateList.classList.remove("hidden");
+        }
+        if (channelsList) {
+            channelsList.style.display = "none";
+            channelsList.classList.add("hidden");
+        }
+        if (privBtn) privBtn.className = "sidebar-tab-btn active";
+        if (chanBtn) chanBtn.className = "sidebar-tab-btn";
     } else {
-        if (privateList) { privateList.style.display = "none"; privateList.classList.add("hidden"); }
-        if (channelsList) { channelsList.style.display = "flex"; channelsList.classList.remove("hidden"); }
-        if (chanBtn) { chanBtn.className = "sidebar-tab-btn active"; }
-        if (privBtn) { privBtn.className = "sidebar-tab-btn"; }
+        if (privateList) {
+            privateList.style.display = "none";
+            privateList.classList.add("hidden");
+        }
+        if (channelsList) {
+            channelsList.style.display = "flex";
+            channelsList.classList.remove("hidden");
+        }
+        if (chanBtn) chanBtn.className = "sidebar-tab-btn active";
+        if (privBtn) privBtn.className = "sidebar-tab-btn";
         loadGroupChannels();
     }
 }
 
-// =========================================================================
-// 7. GRUPPEN-CHANNELS LADEN UND RENDERN (INKL. ADMIN-FREMD-LISTE)
-// =========================================================================
 async function loadGroupChannels() {
     if (!supabaseClient || !currentUser) return;
     const container = document.getElementById("channels-list-container");
@@ -359,7 +386,7 @@ async function loadGroupChannels() {
         });
 
         let html = "";
-
+        
         html += `<div style="font-size: 10px; color: #888; text-transform: uppercase; margin-bottom: 6px; font-weight: bold; letter-spacing: 1px;">Deine Channels</div>`;
         
         if (myChannels.length === 0) {
@@ -386,12 +413,12 @@ async function loadGroupChannels() {
                 const canDelete = !isInfoChannel && (isAdminUser || isCreator);
 
                 return `
-                    <div style="padding: 10px 12px; border-radius: 6px; ${boxStyle} transition: all 0.2s ease; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; cursor: pointer;" onclick="selectChannel('${escapeHTML(c.name)}')">
+                    <div style="padding: 10px 12px; border-radius: 6px; ${boxStyle} transition: all 0.15s ease; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; cursor: pointer;" onclick="selectChannel('${escapeHTML(c.name)}')">
                         <img src="${escapeHTML(channelImg)}" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 1px solid ${isInfoChannel ? '#ff007f' : 'var(--neon-blue)'}; flex-shrink: 0;" onerror="this.src='/img/logo.png';">
                         <div style="flex-grow: 1; min-width: 0;">
                             <div style="color: ${isInfoChannel ? '#ff007f' : '#fff'}; font-weight: bold; font-size: 12px; margin-bottom: 2px; display: flex; align-items: center; gap: 6px;">
                                 <span>#${escapeHTML(c.name)}</span>
-                                ${isInfoChannel ? '<span style="font-size: 8px; background: #ff007f; color: #fff; padding: 1px 4px; border-radius: 3px;">SYSTEM</span>' : ''}
+                                ${isInfoChannel ? '<span class="sender-badge-tag sender-badge-system">SYSTEM</span>' : ''}
                             </div>
                             <div style="color: #888; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                                 ${escapeHTML(c.topic || "Channel")}
@@ -420,7 +447,7 @@ async function loadGroupChannels() {
             html += otherChannels.map(c => {
                 let channelImg = c.banner_image || '/img/logo.png';
                 return `
-                    <div style="padding: 10px 12px; border-radius: 6px; background: rgba(255,0,127,0.04); border: 1px dashed rgba(255,0,127,0.3); transition: all 0.2s ease; margin-bottom: 6px; display: flex; align-items: center; gap: 10px;">
+                    <div style="padding: 10px 12px; border-radius: 6px; background: rgba(255,0,127,0.04); border: 1px dashed rgba(255,0,127,0.3); transition: all 0.15s ease; margin-bottom: 6px; display: flex; align-items: center; gap: 10px;">
                         <img src="${escapeHTML(channelImg)}" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; border: 1px solid var(--neon-pink); flex-shrink: 0;" onerror="this.src='/img/logo.png';">
                         <div style="flex-grow: 1; min-width: 0;">
                             <div style="color: #fff; font-weight: bold; font-size: 12px; margin-bottom: 2px;">
@@ -464,7 +491,7 @@ async function adminJoinChannel(channelName) {
 }
 
 // =========================================================================
-// 8. CHANNEL AUSWÄHLEN UND AKTIVIEREN
+// 9. CHANNEL AUSWÄHLEN UND AKTIVIEREN
 // =========================================================================
 async function selectChannel(channelName) {
     activeChannel = channelName;
@@ -494,10 +521,10 @@ async function selectChannel(channelName) {
     if (header) {
         if (isInfoChannel) {
             header.innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; flex-wrap: wrap; gap: 8px;">
                     <span style="color: #ff007f; font-weight: bold; display: flex; align-items: center; gap: 6px;">
                         <i class="fas fa-shield-alt"></i> Offizieller System-Channel: #${escapeHTML(channelName)}
-                        <span style="font-size: 8px; background: #ff007f; color: #fff; padding: 1px 5px; border-radius: 3px;">SYSTEM</span>
+                        <span class="sender-badge-tag sender-badge-system">SYSTEM</span>
                     </span>
                     <div style="display: flex; gap: 6px; align-items: center;">
                         <button onclick="openChatDesignModal()" class="btn" style="font-size: 10px; padding: 4px 8px; background: rgba(255,0,127,0.1); border: 1px solid #ff007f; color: #ff007f; cursor: pointer;">
@@ -513,7 +540,7 @@ async function selectChannel(channelName) {
             `;
         } else {
             header.innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; flex-wrap: wrap; gap: 8px;">
                     <span style="color:#00f0ff; font-weight:bold;"><i class="fas fa-hashtag"></i> ${escapeHTML(channelName)}</span>
                     <div style="display: flex; gap: 6px; align-items: center;">
                         <button onclick="openChatDesignModal()" class="btn" style="font-size: 10px; padding: 4px 8px; background: rgba(0,240,255,0.1); border: 1px solid #00f0ff; color: #00f0ff; cursor: pointer;">
@@ -537,7 +564,7 @@ async function selectChannel(channelName) {
 }
 
 // =========================================================================
-// 9. CHAT-VERLAUF LADEN
+// 10. CHAT-VERLAUF LADEN
 // =========================================================================
 async function loadChatHistory(partnerUsername) {
     if (!supabaseClient || !currentUser) return;
@@ -584,7 +611,7 @@ async function loadChatHistory(partnerUsername) {
 }
 
 // =========================================================================
-// 10. CHANNEL-EINSTELLUNGEN MODAL
+// 11. CHANNEL-EINSTELLUNGEN MODAL
 // =========================================================================
 function previewSettingsChannelBanner(event) {
     const file = event?.target?.files?.[0];
@@ -636,17 +663,19 @@ async function openChannelSettingsModal(channelName) {
         let membersListHTML = "";
         let inviteListHTML = "";
 
+        const defaultAvatarPath = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "/img/logo.png";
+
         if (allUsers) {
             allUsers.forEach(u => {
                 const isMember = memberMap.has(u.username.toLowerCase());
-                const userAvatar = u.avatar || DEFAULT_AVATAR;
+                const userAvatar = u.avatar || defaultAvatarPath;
 
                 if (isMember) {
                     membersListHTML += `
                         <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; background: #121222; border: 1px solid #333; border-radius: 4px; margin-bottom: 4px;">
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <img src="${escapeHTML(userAvatar)}" style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover;">
-                                <span style="font-size: 11px; color: #fff;">${escapeHTML(u.username)}</span>
+                                <a href="profile.html?user=${encodeURIComponent(u.username)}" class="user-profile-link" style="font-size: 11px;">${escapeHTML(u.username)}</a>
                             </div>
                             <button type="button" onclick="removeMemberFromChannel('${escapeHTML(channelName)}', '${escapeHTML(u.username)}')" style="background: transparent; border: none; color: #ff0055; cursor: pointer;"><i class="fas fa-times"></i></button>
                         </div>
@@ -656,7 +685,7 @@ async function openChannelSettingsModal(channelName) {
                         <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; background: #121222; border: 1px solid #333; border-radius: 4px; margin-bottom: 4px;">
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <img src="${escapeHTML(userAvatar)}" style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover;">
-                                <span style="font-size: 11px; color: #aaa;">${escapeHTML(u.username)}</span>
+                                <a href="profile.html?user=${encodeURIComponent(u.username)}" class="user-profile-link" style="font-size: 11px; color: #aaa;">${escapeHTML(u.username)}</a>
                             </div>
                             <button type="button" onclick="inviteSpecificUser('${escapeHTML(channelName)}', '${escapeHTML(u.username)}')" style="background: rgba(0,240,255,0.1); border: 1px solid #00f0ff; color: #00f0ff; font-size: 10px; padding: 2px 6px; border-radius: 3px; cursor: pointer;"><i class="fas fa-plus"></i></button>
                         </div>
@@ -754,36 +783,6 @@ async function deleteChannel(channelName) {
     loadGroupChannels();
 }
 
-// =========================================================================
-// 11. CHANNEL VERLAUF & REALTIME
-// =========================================================================
-async function loadChannelHistory(channelName) {
-    if (!supabaseClient) return;
-    const container = document.getElementById("chat-bubbles-container");
-    if (!container) return;
-
-    try {
-        const { data: messages } = await supabaseClient
-            .from("group_messages")
-            .select("*")
-            .eq("channel_name", channelName)
-            .order("id", { ascending: true });
-
-        if (!messages || messages.length === 0) {
-            container.innerHTML = `<div style="text-align: center; color: #666; margin: auto; font-size: 12px;">Keine Nachrichten in #${escapeHTML(channelName)}.</div>`;
-            return;
-        }
-
-        container.innerHTML = "";
-        for (const m of messages) {
-            await appendSingleMessageToDOM(m, false);
-        }
-        container.scrollTop = container.scrollHeight;
-    } catch (err) {
-        console.error("Fehler beim Laden des Channel-Verlaufs:", err);
-    }
-}
-
 function setupRealtimeChannelSubscription(channelName) {
     if (!supabaseClient) return;
     if (messagesSubscription) supabaseClient.removeChannel(messagesSubscription);
@@ -812,7 +811,7 @@ function setupChannelMembershipListener() {
 }
 
 // =========================================================================
-// 12. CHANNEL ERSTELLUNGS-MODAL
+// 13. CHANNEL ERSTELLUNGS-MODAL
 // =========================================================================
 function openCreateChannelModal() {
     let modal = document.getElementById("create-channel-modal");
@@ -866,7 +865,7 @@ async function handleCreateChannelSubmit(event) {
 }
 
 // =========================================================================
-// 13. BENUTZER-SUCHE & DIREKTCHAT FUNKTIONEN
+// 14. BENUTZER-SUCHE & DIREKTCHAT FUNKTIONEN
 // =========================================================================
 async function handleUserSearchInput(event) {
     const query = event.target.value.trim();
@@ -876,6 +875,8 @@ async function handleUserSearchInput(event) {
     if (searchTimeout) clearTimeout(searchTimeout);
     if (query.length < 1) { box.classList.add("hidden"); box.innerHTML = ""; return; }
 
+    const defaultAvatarPath = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "/img/logo.png";
+
     searchTimeout = setTimeout(async () => {
         if (!supabaseClient) return;
         const { data: users } = await supabaseClient.from("users").select("username, avatar").ilike("username", `%${query}%`).neq("username", currentUser.username).limit(5);
@@ -883,12 +884,12 @@ async function handleUserSearchInput(event) {
 
         box.innerHTML = users.map(u => `
             <div class="suggestion-item" onclick="selectUserFromSuggestion('${escapeHTML(u.username)}')">
-                <img src="${u.avatar || DEFAULT_AVATAR}" style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover;">
+                <img src="${u.avatar || defaultAvatarPath}" style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover;">
                 <span style="font-size: 12px;">${escapeHTML(u.username)}</span>
             </div>
         `).join("");
         box.classList.remove("hidden");
-    }, 250);
+    }, 150);
 }
 
 function selectUserFromSuggestion(username) {
@@ -912,11 +913,12 @@ async function loadRecentChatPartners() {
 
     try {
         const isAdminUser = checkIsUserAdmin();
+        const defaultAvatarPath = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "/img/logo.png";
 
         const { data: allUsersData } = await supabaseClient.from("users").select("username, avatar");
         const userAvatarMap = new Map();
         if (allUsersData) {
-            allUsersData.forEach(u => userAvatarMap.set(u.username.toLowerCase(), u.avatar || DEFAULT_AVATAR));
+            allUsersData.forEach(u => userAvatarMap.set(u.username.toLowerCase(), u.avatar || defaultAvatarPath));
         }
 
         const { data: sentMessages } = await supabaseClient.from("private_messages").select("sender, recipient, message, read, id, created_at").eq("sender", currentUser.username);
@@ -947,7 +949,7 @@ async function loadRecentChatPartners() {
                     partnerName: storedActivePartner,
                     lastMessage: "Bereit für Nachrichten",
                     timeFormatted: "",
-                    avatar: userAvatarMap.get(pKey) || DEFAULT_AVATAR,
+                    avatar: userAvatarMap.get(pKey) || defaultAvatarPath,
                     hasUnread: false,
                     isOfficial: false,
                     rawId: 999999
@@ -981,7 +983,7 @@ async function loadRecentChatPartners() {
                     partnerName: partner, 
                     lastMessage: m.message || "Medien / Nachricht", 
                     timeFormatted: formattedTime,
-                    avatar: userAvatarMap.get(partnerKey) || DEFAULT_AVATAR, 
+                    avatar: userAvatarMap.get(partnerKey) || defaultAvatarPath, 
                     hasUnread: isUnread, 
                     isOfficial: false,
                     rawId: m.id 
@@ -1014,17 +1016,17 @@ async function loadRecentChatPartners() {
             }
 
             let deleteBtnHTML = !chat.isOfficial ? `
-                <button onclick="event.stopPropagation(); hideChatFromList('${escapeHTML(chat.partnerName)}')" title="Aus Liste löschen" style="background: transparent; border: none; color: #888; cursor: pointer; font-size: 11px; padding: 4px; transition: color 0.2s;" onmouseover="this.style.color='#ff0055'" onmouseout="this.style.color='#888'"><i class="fas fa-trash"></i></button>
+                <button onclick="event.stopPropagation(); hideChatFromList('${escapeHTML(chat.partnerName)}')" title="Aus Liste löschen" style="background: transparent; border: none; color: #888; cursor: pointer; font-size: 11px; padding: 4px; transition: color 0.15s;" onmouseover="this.style.color='#ff0055'" onmouseout="this.style.color='#888'"><i class="fas fa-trash"></i></button>
             ` : '';
 
             html += `
-                <div style="padding: 10px; border-radius: 8px; ${boxStyle} display: flex; align-items: center; gap: 10px; cursor: pointer; transition: 0.2s;" onclick="selectChatPartner('${escapeHTML(chat.partnerName)}')">
-                    <img src="${escapeHTML(chat.avatar)}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid ${chat.isOfficial ? '#ff007f' : '#00f0ff'};" onerror="this.src=DEFAULT_AVATAR;">
+                <div style="padding: 10px; border-radius: 8px; ${boxStyle} display: flex; align-items: center; gap: 10px; cursor: pointer; transition: 0.15s;" onclick="selectChatPartner('${escapeHTML(chat.partnerName)}')">
+                    <img src="${escapeHTML(chat.avatar)}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid ${chat.isOfficial ? '#ff007f' : '#00f0ff'};" onerror="this.src='/img/logo.png';">
                     <div style="flex-grow: 1; min-width: 0;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
                             <span style="color: ${chat.isOfficial ? '#ff007f' : (chat.hasUnread ? '#00f0ff' : '#ccc')}; font-weight: bold; font-size: 12px; display: flex; align-items: center; gap: 5px;">
                                 ${escapeHTML(chat.partnerName)}
-                                ${chat.isOfficial ? '<span style="font-size: 8px; background: #ff007f; color: #fff; padding: 1px 4px; border-radius: 3px;">SYSTEM</span>' : ''}
+                                ${chat.isOfficial ? '<span class="sender-badge-tag sender-badge-system">SYSTEM</span>' : ''}
                             </span>
                             <span style="color: #666; font-size: 9px;">${escapeHTML(chat.timeFormatted)}</span>
                         </div>
@@ -1072,14 +1074,16 @@ async function selectChatPartner(username) {
         await supabaseClient.from("private_messages").update({ read: true }).eq("recipient", currentUser.username).eq("sender", username);
     }
 
+    const defaultAvatarPath = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "/img/logo.png";
+
     const header = document.getElementById("active-chat-header");
     if (header) {
         if (isStudioChat) {
             header.innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; flex-wrap: wrap; gap: 8px;">
                     <span style="color: #ff007f; font-weight: bold; display: flex; align-items: center; gap: 6px;">
                         <i class="fas fa-shield-alt"></i> Offizieller Direktchat: ${escapeHTML(username)}
-                        <span style="font-size: 8px; background: #ff007f; color: #fff; padding: 1px 5px; border-radius: 3px;">SYSTEM</span>
+                        <span class="sender-badge-tag sender-badge-system">SYSTEM</span>
                     </span>
                     <button onclick="openChatDesignModal()" class="btn" style="font-size: 10px; padding: 4px 8px; background: rgba(255,0,127,0.1); border: 1px solid #ff007f; color: #ff007f; cursor: pointer;">
                         <i class="fas fa-palette"></i> Design
@@ -1087,18 +1091,19 @@ async function selectChatPartner(username) {
                 </div>
             `;
         } else {
-            let partnerAvatar = DEFAULT_AVATAR;
+            let partnerAvatar = defaultAvatarPath;
             try {
                 const { data: uData } = await supabaseClient.from("users").select("avatar").eq("username", username).maybeSingle();
                 if (uData && uData.avatar) partnerAvatar = uData.avatar;
             } catch (e) {}
 
             header.innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-                    <div style="display: flex; align-items: center; gap: 10px; cursor: pointer;" onclick="window.location.href='profil.html?user=${encodeURIComponent(username)}'" title="Profil aufrufen">
-                        <img src="${escapeHTML(partnerAvatar)}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--neon-blue);" onerror="this.src=DEFAULT_AVATAR;">
-                        <span style="color: var(--neon-blue); font-weight: bold; font-size: 13px; text-decoration: underline;">${escapeHTML(username)}</span>
-                    </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; flex-wrap: wrap; gap: 8px;">
+                    <a href="profile.html?user=${encodeURIComponent(username)}" class="user-profile-link" style="display: flex; align-items: center; gap: 10px;" title="Profil von ${escapeHTML(username)} aufrufen">
+                        <img src="${escapeHTML(partnerAvatar)}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid var(--neon-blue);" onerror="this.src='/img/logo.png';">
+                        <span style="color: var(--neon-blue); font-weight: bold; font-size: 13px;">${escapeHTML(username)}</span>
+                        <span class="sender-badge-tag sender-badge-operator">OPERATOR</span>
+                    </a>
                     <div style="display: flex; gap: 6px; align-items: center;">
                         <button onclick="openChatDesignModal()" class="btn" style="font-size: 10px; padding: 4px 8px; background: rgba(0,240,255,0.1); border: 1px solid #00f0ff; color: #00f0ff; cursor: pointer;">
                             <i class="fas fa-palette"></i> Design
@@ -1218,8 +1223,35 @@ function setupRealtimeChatSubscription(partnerUsername) {
 }
 
 // =========================================================================
-// 14. NACHRICHTEN RENDERN (INKL. ADMIN-LÖSCHRECHT FÜR CHANNELS)
+// 15. NACHRICHTEN RENDERN (MIT ZOOM-BILDERN & PROFIL-LINKS)
 // =========================================================================
+let messageRenderQueue = [];
+let isProcessingQueue = false;
+let lastScrollTime = 0;
+
+async function processMessageQueue() {
+    if (isProcessingQueue) return;
+    isProcessingQueue = true;
+    
+    try {
+        const batchSize = 50;
+        const toProcess = messageRenderQueue.splice(0, batchSize);
+        
+        for (const m of toProcess) {
+            await appendSingleMessageToDOM(m, false);
+        }
+        
+        performanceMonitor.renderCount += toProcess.length;
+        performanceMonitor.batchCount++;
+        
+        if (messageRenderQueue.length > 0) {
+            setTimeout(processMessageQueue, 10);
+        }
+    } finally {
+        isProcessingQueue = false;
+    }
+}
+
 async function appendSingleMessageToDOM(m, scrollToBottom = true) {
     const container = document.getElementById("chat-bubbles-container");
     if (!container) return;
@@ -1243,10 +1275,15 @@ async function appendSingleMessageToDOM(m, scrollToBottom = true) {
         </div>
     ` : '';
 
-    let imgHtml = m.image ? `<div style="margin-top: 6px;"><img src="${m.image}" style="max-width: 100%; max-height: 180px; border-radius: 6px; object-fit: contain;"></div>` : '';
+    let imgHtml = m.image ? `<div style="margin-top: 6px;"><img src="${m.image}" onclick="openImageZoomModal('${m.image}')" style="max-width: 100%; max-height: 180px; border-radius: 6px; object-fit: contain; cursor: zoom-in;" title="Zum Zoomen anklicken"></div>` : '';
     let videoHtml = m.video ? `<div style="margin-top: 6px;"><video src="${m.video}" controls style="max-width: 100%; max-height: 200px; border-radius: 6px;"></video></div>` : '';
     
     const isOfficialSender = m.sender.toLowerCase() === "437 studio";
+    const badgeHtml = isOfficialSender ? '<span class="sender-badge-tag sender-badge-system">SYSTEM</span>' : '<span class="sender-badge-tag sender-badge-operator">OPERATOR</span>';
+
+    const senderHeaderContent = isOfficialSender 
+        ? `<span style="color: #ff007f;">${escapeHTML(m.sender)} ${badgeHtml}</span>`
+        : `<a href="profile.html?user=${encodeURIComponent(m.sender)}" class="user-profile-link" style="color: var(--neon-blue);">${escapeHTML(m.sender)}</a> ${badgeHtml}`;
 
     const bubbleRow = document.createElement("div");
     bubbleRow.id = `msg-bubble-${m.id}`;
@@ -1259,10 +1296,12 @@ async function appendSingleMessageToDOM(m, scrollToBottom = true) {
     `;
 
     bubbleRow.innerHTML = `
-        <img src="${escapeHTML(senderAvatar)}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid ${isOfficialSender ? '#ff007f' : '#00f0ff'}; flex-shrink: 0;" onerror="this.src=DEFAULT_AVATAR;">
-        <div style="max-width: 75%; display: flex; flex-direction: column; align-items: ${isSent ? 'flex-end' : 'flex-start'};">
-            <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; margin-bottom: 3px; color: #bbb; font-weight: bold;">
-                <span style="color: ${isOfficialSender ? '#ff007f' : '#00f0ff'};">${escapeHTML(m.sender)} ${isOfficialSender ? '<span style="font-size: 8px; background: #ff007f; color: #fff; padding: 1px 4px; border-radius: 3px;">SYSTEM</span>' : ''}</span>
+        <a href="${isOfficialSender ? '#' : 'profile.html?user=' + encodeURIComponent(m.sender)}" style="flex-shrink: 0; text-decoration: none;">
+            <img src="${escapeHTML(senderAvatar)}" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid ${isOfficialSender ? '#ff007f' : '#00f0ff'};" onerror="this.src='/img/logo.png';">
+        </a>
+        <div style="max-width: 80%; display: flex; flex-direction: column; align-items: ${isSent ? 'flex-end' : 'flex-start'};">
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; margin-bottom: 3px; color: #bbb; font-weight: bold; flex-wrap: wrap;">
+                ${senderHeaderContent}
                 <span style="font-size: 10px; color: #888; background: rgba(0,0,0,0.5); padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1);">${escapeHTML(timeFormatted)}</span>
             </div>
             <div class="bubble ${isSent ? 'sent' : 'received'}" style="position: relative; width: 100%;">
@@ -1274,7 +1313,13 @@ async function appendSingleMessageToDOM(m, scrollToBottom = true) {
     `;
 
     container.appendChild(bubbleRow);
-    if (scrollToBottom) container.scrollTop = container.scrollHeight;
+    if (scrollToBottom) {
+        const now = Date.now();
+        if (now - lastScrollTime > 16) {
+            container.scrollTop = container.scrollHeight;
+            lastScrollTime = now;
+        }
+    }
 }
 
 async function deleteMessage(msgId, type) {
@@ -1293,12 +1338,17 @@ async function deleteMessage(msgId, type) {
 
 function removeMessageFromDOM(msgId) {
     const el = document.getElementById(`msg-bubble-${msgId}`);
-    if (el) el.remove();
+    if (el) {
+        el.remove();
+        if (performanceMonitor.renderCount > 10000) {
+            cleanOldRenderedIds();
+        }
+    }
     renderedMessageIds.delete(msgId);
 }
 
 // =========================================================================
-// 15. MEDIEN & SPRACHAUFNAHME
+// 16. MEDIEN & SPRACHAUFNAHME
 // =========================================================================
 function previewMessageImage(event) {
     const file = event?.target?.files?.[0];
@@ -1505,3 +1555,106 @@ function onVoiceEnded(audio) {
     if (btnIcon) btnIcon.className = "fas fa-play";
     audio.currentTime = 0;
 }
+
+// =========================================================================
+// PERFORMANCE MONITORING & OPTIMIZATION
+// =========================================================================
+const PERFORMANCE_THRESHOLDS = {
+    maxMessagesToRender: 5000,
+    maxRenderTime: 100,
+    maxMemoryUsage: 100 * 1024 * 1024, // 100MB
+    cleanupInterval: 60000 // 1 minute
+};
+
+let performanceMonitor = {
+    init: Date.now(),
+    renderCount: 0,
+    batchCount: 0,
+    lastCleanup: Date.now(),
+    renderTimes: [],
+    memoryUsage: 0
+};
+
+function monitorPerformance(operation, startTime) {
+    const duration = Date.now() - startTime;
+    performanceMonitor.renderTimes.push(duration);
+    
+    if (performanceMonitor.renderTimes.length > 100) {
+        performanceMonitor.renderTimes.shift();
+    }
+    
+    const avgRenderTime = performanceMonitor.renderTimes.reduce((a, b) => a + b, 0) / performanceMonitor.renderTimes.length;
+    
+    if (avgRenderTime > PERFORMANCE_THRESHOLDS.maxRenderTime) {
+        console.warn(`Performance degradation detected: Average render time ${avgRenderTime.toFixed(2)}ms exceeds threshold ${PERFORMANCE_THRESHOLDS.maxRenderTime}ms`);
+        if (performanceMonitor.renderCount > PERFORMANCE_THRESHOLDS.maxMessagesToRender) {
+            console.warn("Critical performance issue: Too many messages rendered. Initiating cleanup...");
+            cleanOldRenderedIds();
+        }
+    }
+    
+    performanceMonitor.renderCount++;
+}
+
+function cleanupEventListeners() {
+    if (window.messageSystemListeners) {
+        window.messageSystemListeners.forEach(listener => {
+            if (listener.element && listener.element.removeEventListener) {
+                listener.element.removeEventListener(listener.event, listener.handler);
+            }
+        });
+        window.messageSystemListeners = [];
+    }
+}
+
+function setupPerformanceMonitoring() {
+    setInterval(() => {
+        const now = Date.now();
+        const timeSinceInit = now - performanceMonitor.init;
+        
+        if (now - performanceMonitor.lastCleanup > PERFORMANCE_THRESHOLDS.cleanupInterval) {
+            cleanOldRenderedIds();
+            performanceMonitor.lastCleanup = now;
+        }
+        
+        const avgRenderTime = performanceMonitor.renderTimes.length > 0
+            ? performanceMonitor.renderTimes.reduce((a, b) => a + b, 0) / performanceMonitor.renderTimes.length
+            : 0;
+        
+        console.log(`Performance Monitor - Avg Render: ${avgRenderTime.toFixed(2)}ms, Messages: ${performanceMonitor.renderCount}, Batches: ${performanceMonitor.batchCount}, Memory: ${performanceMonitor.memoryUsage} bytes`);
+        
+    }, 30000);
+}
+
+function cleanupResources() {
+    if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+    }
+    if (mediaRecorder) {
+        const tracks = mediaRecorder.stream?.getTracks();
+        tracks?.forEach(track => track.stop());
+    }
+    mediaRecorder = null;
+    audioChunks = [];
+    recordedAudioBase64 = null;
+    
+    if (searchTimeout) clearTimeout(searchTimeout);
+    if (messagesSubscription) supabaseClient?.removeChannel(messagesSubscription);
+    if (membershipSubscription) supabaseClient?.removeChannel(membershipSubscription);
+    
+    cleanupEventListeners();
+    
+    performanceMonitor = {
+        init: Date.now(),
+        renderCount: 0,
+        batchCount: 0,
+        lastCleanup: Date.now(),
+        renderTimes: [],
+        memoryUsage: 0
+    };
+}
+
+window.addEventListener('beforeunload', cleanupResources);
+
+// Initialize performance monitoring after DOM is ready
+window.addEventListener('DOMContentLoaded', setupPerformanceMonitoring);
