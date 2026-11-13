@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+    <meta name="description" content="437 Core - Real-time chat and voice communication platform">
+    <meta name="color-scheme" content="dark light">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="437 Core">
+    <title>437 Core</title>
+    <link rel="stylesheet" href="style.css?v=26">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Audiowide&family=Bungee&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="icon" href="img/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="img/favicon-16x16.png">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+    <meta name="theme-color" content="#ffb347">
+</head>
+
+<body>
+    <a class="skip-link" href="#main">Zum Inhalt springen</a>
+
+    <!-- Premium Entry Animation -->
+    <div id="entryOverlay" class="entry-overlay">
+        <div class="entry-bg"></div>
+        <div class="entry-glow"></div>
+        <div class="entry-content">
+            <div class="entry-logo">
+                <span class="entry-bracket">[</span>
+                <span class="entry-text">437</span>
+                <span class="entry-bracket">]</span>
+            </div>
+            <div class="entry-tagline">CORE SYSTEM</div>
+            <div class="entry-loader">
+                <div class="entry-bar entry-bar-1"></div>
+                <div class="entry-bar entry-bar-2"></div>
+                <div class="entry-bar entry-bar-3"></div>
+                <div class="entry-bar entry-bar-4"></div>
+                <div class="entry-bar entry-bar-5"></div>
+            </div>
+        </div>
+        <div class="entry-particles" id="entryParticles"></div>
+    </div>
+
+    <div class="grid-bg"></div>
+    <div class="scanlines"></div>
+
+    <header class="header">
+        <nav class="nav">
+            <div class="logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">437 CORE</span>
+                <span class="logo-bracket">]</span>
+            </div>
+            <div class="nav-user">
+                <div class="nav-avatar" id="navAvatar"><span class="avatar-placeholder" style="font-size: 1.2rem;">?</span></div>
+                <span class="nav-nickname" id="navNickname">LOADING...</span>
+                <button id="voiceNavBtn" class="voice-nav-btn" title="Voice Channels">VOICE</button>
+                <div class="nav-dropdown">
+                    <button id="menuBtn" class="menu-btn">☰<span id="menuUnreadBadge" class="menu-unread-badge" style="display:none;">0</span></button>
+                    <div id="menuDrop" class="menu-drop" style="display:none;">
+                        <button id="settingsBtn">EINSTELLUNGEN</button>
+                        <button id="logoutBtn">LOGOUT</button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main id="main" tabindex="-1">
+        <div class="chat-layout">
+            <aside class="chat-sidebar">
+                <div class="sidebar-header">
+                    <span class="sidebar-title">[ VOICE CHANNELS ]</span>
+                </div>
+                <div class="voice-create">
+                    <input type="text" id="voiceEmoji" class="voice-input" placeholder="EMOJI (OPTIONAL)" maxlength="2">
+                    <input type="text" id="voiceChannelName" class="voice-input" placeholder="CHANNEL NAME..." maxlength="16">
+                    <button id="createVoiceBtn" class="voice-create-btn">ERSTELLEN</button>
+                </div>
+                <div class="voice-list" id="voiceList"></div>
+                <div class="voice-active" id="voiceActive" style="display: none;">
+                    <div class="voice-active-header">
+                        <span>IN VOICE</span>
+                    </div>
+                    <div class="voice-active-info">
+                        <span id="voiceActiveName"></span>
+                        <span class="voice-timer" id="voiceTimer">00:00</span>
+                        <video id="voiceLocalVideo" autoplay playsinline muted style="display:none; width:64px; height:64px; border-radius:8px; border:2px solid var(--neon-cyan); object-fit:cover; margin-top:6px;"></video>
+                    </div>
+                    <div class="voice-controls">
+                        <button id="muteBtn" class="voice-control-btn" title="Stummschalten">🎤</button>
+                        <button id="camBtn" class="voice-control-btn" title="Kamera">📹</button>
+                        <button id="screenBtn" class="voice-control-btn" title="Bildschirm teilen">🖥️</button>
+                        <button id="speakerBtn" class="voice-control-btn active" title="Lautsprecher">🔊</button>
+                        <button id="voiceHistoryBtn" class="voice-control-btn" title="Call-Verlauf">📜</button>
+                        <button id="voiceChatBtn" class="voice-control-btn" title="Text-Chat">💬</button>
+                    </div>
+                    <div class="voice-quality" id="voiceQuality" style="font-size:0.65rem;color:var(--text-secondary);margin-top:4px;">QUALITÄT: EXZELLENT</div>
+                    <button id="leaveVoiceBtn" class="voice-leave-btn">VERLASSEN</button>
+                    <div class="voice-participants" id="voiceParticipants"></div>
+                    <div class="voice-history-panel" id="voiceHistoryPanel" style="display:none;">
+                        <div class="voice-history-header">
+                            <span>CALL-VERLAUF</span>
+                            <button id="voiceHistoryClose" class="voice-history-close" title="Schließen">✕</button>
+                        </div>
+                        <div class="voice-history-list" id="voiceHistoryList"></div>
+                    </div>
+                    <div class="voice-chat-panel" id="voiceChatPanel" style="display:none;">
+                        <div class="voice-chat-header">
+                            <span>TEXT-CHAT</span>
+                            <button id="voiceChatClose" class="voice-chat-close" title="Schließen">✕</button>
+                        </div>
+                        <div class="voice-chat-messages" id="voiceChatMessages"></div>
+                        <div class="voice-chat-input-wrap">
+                            <input type="text" id="voiceChatInput" placeholder="Nachricht…" autocomplete="off">
+                            <button id="voiceChatSend" class="voice-chat-send">Senden</button>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+            <div class="chat-main">
+                <div class="chat-header" id="chatHeader">
+                    <div id="channelStrip" class="channel-strip" aria-label="Kanäle und DMs"></div>
+                    <div class="chat-search-wrap">
+                        <input type="text" id="userSearchInput" class="chat-search-input" placeholder="USER..." autocomplete="off" aria-label="User suchen">
+                        <div id="userSearchResults" class="chat-search-results"></div>
+                    </div>
+                    <div class="msg-search-wrap">
+                        <input type="text" id="msgSearchInput" class="chat-search-input" placeholder="SUCHE..." autocomplete="off" aria-label="Nachrichten filtern">
+                        <button type="button" id="msgSearchClear" class="chat-search-clear" title="Löschen" aria-label="Nachrichtensuche löschen">✕</button>
+                    </div>
+                </div>
+                <div id="dmCallBar" class="dm-call-bar" style="display:none;" aria-label="Anruf">
+                    <div class="dm-call-peer">
+                        <span class="dm-call-avatar-wrap"><img id="dmCallAvatar" class="dm-call-avatar" alt=""><span id="dmCallOnline" class="online-dot"></span></span>
+                        <span class="dm-call-meta">
+                            <span id="dmCallName" class="dm-call-name"></span>
+                            <span id="dmCallStatus" class="dm-call-status"></span>
+                        </span>
+                    </div>
+                    <div class="dm-call-actions">
+                        <button type="button" id="dmCallAudioBtn" class="dm-call-btn" title="Audioanruf" aria-label="Audioanruf"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></button>
+                        <button type="button" id="dmCallVideoBtn" class="dm-call-btn" title="Videoanruf" aria-label="Videoanruf"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></button>
+                    </div>
+                </div>
+                <button type="button" id="chatHeaderReveal" class="chat-header-reveal" aria-label="Header anzeigen" title="Header anzeigen" style="display:none;">▾</button>
+                <div id="pinnedBar" class="pinned-bar" style="display:none;"></div>
+                <div class="chat-messages" id="chatMessages" data-channel="drops437" role="log" aria-live="polite" aria-label="Chat-Nachrichten">
+                    <button id="loadOlderBtn" class="load-older-btn" style="display:none;">ÄLTERE NACHRICHTEN LADEN</button>
+                </div>
+                <div class="fixed-btn-stack">
+                    <button id="voiceFixedBtn" class="voice-fixed-btn" title="Voice Channels">🎤</button>
+                    <button id="scrollBottomBtn" class="scroll-bottom-btn" style="display:none;">↓</button>
+                </div>
+                <div class="typing-indicator" id="typingIndicator" style="display: none;">
+                    <span class="typing-dots"><span></span><span></span><span></span></span>
+                    <span id="typingText"></span>
+                </div>
+                <div class="chat-input-container">
+                    <div id="audioRec" class="audio-rec" style="display:none;">
+                        <canvas id="waveCanvas" width="160" height="32"></canvas>
+                        <span id="recTimer">00:00</span>
+                        <button id="recDelete" class="rec-btn">🗑</button>
+                        <button id="recSend" class="rec-btn send">➤</button>
+                    </div>
+                    <div id="previewChip" class="preview-chip" style="display:none;"></div>
+                    <div id="replyPreview" class="reply-preview" style="display:none;">
+                        <span class="rp-text" id="replyPreviewText"></span>
+                        <button class="rp-cancel" id="replyCancelBtn" title="Abbrechen">✕</button>
+                    </div>
+                    <div id="attachPreview" class="attach-preview" hidden></div>
+                    <div class="chat-input-row">
+                        <button id="attachBtn" class="icon-btn attach-btn" title="Anhang" aria-haspopup="dialog" aria-expanded="false" aria-controls="attachSheet"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+                        <button id="audioBtn" class="icon-btn" title="Audio"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
+                        <input type="file" id="galleryInput" accept="image/*,video/*" multiple hidden>
+                        <input type="file" id="docInput" hidden>
+                        <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
+                        <input type="text" id="chatInput" class="chat-input" placeholder="MESSAGE IN #437..." autocomplete="off">
+                        <button id="chatSend" class="chat-send">SEND</button>
+                    </div>
+                    <div id="attachSheet" class="attach-sheet" role="dialog" aria-modal="true" aria-label="Anhang auswählen" hidden>
+                        <div class="attach-sheet-head">
+                            <span class="attach-sheet-title">ANHANG</span>
+                            <button type="button" id="attachClose" class="attach-close" aria-label="Schließen">✕</button>
+                        </div>
+                        <div class="attach-grid">
+                            <button type="button" class="attach-tile" data-act="gallery"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span>Galerie</span></button>
+                            <button type="button" class="attach-tile" data-act="camera"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span>Kamera</span></button>
+                            <button type="button" class="attach-tile" data-act="location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg><span>Standort</span></button>
+                            <button type="button" class="attach-tile" data-act="document"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span>Dokumente</span></button>
+                            <button type="button" class="attach-tile" data-act="poll"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Abstimmung</span></button>
+                            <button type="button" class="attach-tile" data-act="event"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Ereignis</span></button>
+                        </div>
+                        <div id="attachStatus" class="attach-status" role="status" aria-live="polite"></div>
+                    </div>
+                    <div id="mentionDrop" class="mention-drop" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="video-grid" id="videoGrid" style="display: none;"></div>
+
+    <!-- Drops 437 Video Display -->
+    <div class="drops-video-grid" id="dropsVideoGrid" style="display: none;" aria-label="Drops 437 Videos"></div>
+
+    <div class="video-fullscreen-modal" id="videoFullscreenModal">
+        <button id="videoFullscreenClose" class="video-fullscreen-close">✕</button>
+        <div id="videoFullscreenContent"></div>
+        <div id="videoFullscreenLabel" class="video-fullscreen-label"></div>
+    </div>
+
+    <div id="profileModal" class="media-modal profile-modal" style="display:none;" role="dialog" aria-modal="true" aria-label="Benutzerprofil">
+        <div class="profile-card">
+            <button id="profileModalClose" class="profile-close" aria-label="Schließen">✕</button>
+            <div class="profile-head">
+                <div class="profile-avatar-wrap">
+                    <img id="profileAvatar" class="profile-avatar" alt="">
+                    <span id="profileOnlineDot" class="profile-status-dot"></span>
+                </div>
+                <div class="profile-meta">
+                    <div id="profileName" class="profile-name"></div>
+                    <div id="profileStatusText" class="profile-status-text"></div>
+                </div>
+            </div>
+            <div class="profile-section">
+                <div class="profile-label">BIO</div>
+                <div id="profileBio" class="profile-bio"></div>
+            </div>
+            <div class="profile-section">
+                <div class="profile-label">ABZEICHEN</div>
+                <div id="profileBadges" class="profile-badges"></div>
+            </div>
+            <div id="profileActions" class="profile-actions" style="margin-top:12px;"></div>
+        </div>
+    </div>
+    <div id="mediaModal" class="media-modal" style="display:none;" role="dialog" aria-modal="true" aria-label="Medienansicht">
+        <div class="media-modal-content" id="mediaModalContent"></div>
+        <button id="mediaModalClose" class="media-modal-close">✕</button>
+    </div>
+    <div id="confirmModal" class="media-modal" style="display:none;">
+        <div class="confirm-box">
+            <p id="confirmText"></p>
+            <div class="confirm-actions">
+                <button id="confirmNo" class="btn btn-secondary">ABBRECHEN</button>
+                <button id="confirmYes" class="btn btn-primary">BESTÄTIGEN</button>
+            </div>
+        </div>
+    </div>
+    <div id="reportModal" class="media-modal" style="display:none;" role="dialog" aria-modal="true" aria-label="Nachricht melden">
+        <div class="report-modal-box">
+            <h3>NACHRICHT MELDEN</h3>
+            <textarea id="reportReason" placeholder="Grund (optional)..."></textarea>
+            <div class="report-modal-actions">
+                <button id="reportCancelBtn" class="btn btn-secondary">ABBRECHEN</button>
+                <button id="reportSubmitBtn" class="btn btn-primary">MELDEN</button>
+            </div>
+        </div>
+    </div>
+    <div id="cameraModal" class="media-modal" style="display:none;" role="dialog" aria-modal="true" aria-label="Kamera">
+        <div class="camera-card">
+            <div class="camera-head">
+                <span class="camera-title">KAMERA</span>
+                <button type="button" id="camClose" class="media-modal-close" aria-label="Schließen">✕</button>
+            </div>
+            <div class="camera-stage">
+                <video id="camVideo" playsinline autoplay muted></video>
+                <canvas id="camCanvas" hidden></canvas>
+                <img id="camPreviewImg" class="camera-preview-img" alt="Aufnahme" hidden>
+                <div id="camError" class="cam-error" role="status" hidden></div>
+            </div>
+            <div class="camera-actions">
+                <button type="button" id="camSwitch" class="icon-btn" title="Kamera wechseln" aria-label="Kamera wechseln"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
+                <button type="button" id="camShot" class="cam-shot" title="Aufnehmen" aria-label="Aufnehmen"></button>
+                <button type="button" id="camRetake" class="icon-btn" title="Neu aufnehmen" aria-label="Neu aufnehmen" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 0 0 14.85 3.36L23 14"/></svg></button>
+                <button type="button" id="camUse" class="btn btn-primary" hidden>SENDEN</button>
+            </div>
+        </div>
+    </div>
+    <div id="pollModal" class="media-modal" style="display:none;" role="dialog" aria-modal="true" aria-label="Abstimmung erstellen">
+        <div class="form-modal-box">
+            <div class="form-modal-head">
+                <h3>ABSTIMMUNG</h3>
+                <button type="button" class="form-modal-close" data-close="pollModal" aria-label="Schließen">✕</button>
+            </div>
+            <label class="fm-label" for="pollQuestion">FRAGE</label>
+            <input id="pollQuestion" class="settings-input" maxlength="200" placeholder="Worüber soll abgestimmt werden?">
+            <div class="fm-label">OPTIONEN</div>
+            <div id="pollOptions" class="poll-options"></div>
+            <button type="button" id="pollAddOption" class="btn btn-secondary btn-sm">+ OPTION</button>
+            <div id="pollStatus" class="settings-msg" role="status"></div>
+            <div class="form-modal-actions">
+                <button type="button" class="btn btn-secondary" data-close="pollModal">ABBRECHEN</button>
+                <button type="button" id="pollSendBtn" class="btn btn-primary">SENDEN</button>
+            </div>
+        </div>
+    </div>
+    <div id="eventModal" class="media-modal" style="display:none;" role="dialog" aria-modal="true" aria-label="Ereignis erstellen">
+        <div class="form-modal-box">
+            <div class="form-modal-head">
+                <h3>EREIGNIS</h3>
+                <button type="button" class="form-modal-close" data-close="eventModal" aria-label="Schließen">✕</button>
+            </div>
+            <label class="fm-label" for="eventTitle">TITEL</label>
+            <input id="eventTitle" class="settings-input" maxlength="120" placeholder="Was passiert?">
+            <label class="fm-label" for="eventLocation">ORT</label>
+            <input id="eventLocation" class="settings-input" maxlength="160" placeholder="Ort (optional)">
+            <div class="fm-grid2">
+                <div>
+                    <label class="fm-label" for="eventStart">BEGINN</label>
+                    <input id="eventStart" class="settings-input" type="datetime-local">
+                </div>
+                <div>
+                    <label class="fm-label" for="eventEnd">ENDE</label>
+                    <input id="eventEnd" class="settings-input" type="datetime-local">
+                </div>
+            </div>
+            <label class="fm-label" for="eventDesc">BESCHREIBUNG</label>
+            <textarea id="eventDesc" class="settings-input" rows="3" maxlength="1000" placeholder="Details (optional)"></textarea>
+            <div id="eventStatus" class="settings-msg" role="status"></div>
+            <div class="form-modal-actions">
+                <button type="button" class="btn btn-secondary" data-close="eventModal">ABBRECHEN</button>
+                <button type="button" id="eventSendBtn" class="btn btn-primary">SENDEN</button>
+            </div>
+        </div>
+    </div>
+    <!-- ============ DM CALLS (Audio/Video 1:1) ============ -->
+    <div id="callOverlay" class="call-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="Anruf">
+        <div class="call-orb">
+            <span class="call-rings" aria-hidden="true"><span></span><span></span><span></span></span>
+            <img id="callPeerAvatar" class="call-avatar" alt="">
+        </div>
+        <div class="call-identity">
+            <div id="callPeerName" class="call-name"></div>
+            <div id="callPeerStatus" class="call-status">437 CORE ANRUF</div>
+        </div>
+        <div class="call-actions">
+            <button type="button" id="callDeclineBtn" class="call-btn call-decline" title="Ablehnen" aria-label="Ablehnen">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+            </button>
+            <button type="button" id="callAcceptBtn" class="call-btn call-accept" title="Annehmen" aria-label="Annehmen">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            </button>
+        </div>
+        <div id="callHint" class="call-hint"></div>
+    </div>
+
+    <div id="callStage" class="call-stage" style="display:none;" role="dialog" aria-modal="true" aria-label="Aktiver Anruf">
+        <video id="callRemoteVideo" class="call-remote-video" autoplay playsinline muted></video>
+        <div id="callAudioOrb" class="call-audio-orb" aria-hidden="true"><span></span></div>
+        <div class="call-stage-top">
+            <div class="call-stage-id">
+                <span id="callStageName" class="call-stage-name"></span>
+                <span id="callQuality" class="call-quality"></span>
+            </div>
+            <span id="callStageTimer" class="call-stage-timer">00:00</span>
+        </div>
+        <button type="button" id="callMinimizeBtn" class="call-minimize" title="Minimieren" aria-label="Minimieren">—</button>
+        <video id="callLocalVideo" class="call-local-video" autoplay playsinline muted></video>
+        <div id="callReconnect" class="call-reconnect" style="display:none;">VERBINDUNG WIRD WIEDERHERGESTELLT…</div>
+        <div class="call-controls">
+            <button type="button" id="callMuteBtn" class="call-control-btn" title="Stummschalten" aria-label="Stummschalten">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+            </button>
+            <button type="button" id="callCamBtn" class="call-control-btn" title="Kamera" aria-label="Kamera">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+            </button>
+            <button type="button" id="callFlipBtn" class="call-control-btn" title="Kamera wechseln" aria-label="Kamera wechseln">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </button>
+            <button type="button" id="callSpeakerBtn" class="call-control-btn active" title="Lautsprecher" aria-label="Lautsprecher">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+            </button>
+            <button type="button" id="callShareBtn" class="call-control-btn" title="Bildschirm teilen" aria-label="Bildschirm teilen">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </button>
+            <button type="button" id="callEndBtn" class="call-control-btn call-end" title="Auflegen" aria-label="Auflegen">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <audio id="callRemoteAudio" autoplay playsinline></audio>
+
+    <div id="callMini" class="call-mini" style="display:none;">
+        <div class="call-mini-id">
+            <img id="callMiniAvatar" class="call-mini-avatar" alt="">
+            <span class="call-mini-meta"><span id="callMiniName" class="call-mini-name"></span><span id="callMiniTimer" class="call-mini-timer">00:00</span></span>
+        </div>
+        <div class="call-mini-actions">
+            <button type="button" id="callMiniExpand" class="call-mini-btn" title="Anruf anzeigen" aria-label="Anruf anzeigen">▴</button>
+            <button type="button" id="callMiniEnd" class="call-mini-btn call-mini-end" title="Auflegen" aria-label="Auflegen">✕</button>
+        </div>
+    </div>
+
+    <div id="callToast" class="call-toast" style="display:none;" role="status" aria-live="polite"></div>
+
+    <script defer src="config.js?v=26"></script>
+    <script defer src="maintenance.js?v=4"></script>
+    <script defer src="broadcast.js?v=8"></script>
+    <script defer src="a11y.js?v=1"></script>
+    <script defer src="app.js?v=26"></script>
+    <script defer src="dm-calls.js?v=2"></script>
+    <script>if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
+</body>
+</html>
