@@ -11,30 +11,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="437 Core">
     <title>437 Core</title>
-    <script>
-(function(){
-    window.__CACHE_BUSTER__ = Date.now();
-    var assets = [
-        {type:'css', url:'style.css'},
-        {type:'js', url:'config.js', defer:true},
-        {type:'js', url:'maintenance.js', defer:true},
-        {type:'js', url:'broadcast.js', defer:true},
-        {type:'js', url:'a11y.js', defer:true},
-        {type:'js', url:'app.js', defer:true},
-        {type:'js', url:'dm-calls.js', defer:true}
-    ];
-    assets.forEach(function(a){
-        if(a.type==='css'){
-            var l=document.createElement('link'); l.rel='stylesheet';
-            l.href=a.url+'?cb='+window.__CACHE_BUSTER__;
-            document.head.appendChild(l);
-        } else {
-            var s=document.createElement('script'); s.src=a.url+'?cb='+window.__CACHE_BUSTER__;
-            s.defer=a.defer; document.head.appendChild(s);
-        }
-    });
-})();
-</script>
+    <link rel="stylesheet" href="style.css?v=26">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Audiowide&family=Bungee&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
@@ -407,6 +384,12 @@
 
     <div id="callToast" class="call-toast" style="display:none;" role="status" aria-live="polite"></div>
 
+    <script defer src="config.js?v=26"></script>
+    <script defer src="maintenance.js?v=4"></script>
+    <script defer src="broadcast.js?v=8"></script>
+    <script defer src="a11y.js?v=1"></script>
+    <script defer src="app.js?v=27"></script>
+    <script defer src="dm-calls.js?v=2"></script>
     <script>if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
 </body>
 </html>

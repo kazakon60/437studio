@@ -4664,17 +4664,14 @@ async function loadParticipants() {
 
 // ---------- Voice System Messages im Chat ----------
 async function postVoiceSystemMessage(channelId, content) {
-    if (!channelId || !content || !user || !user.id) {
-        if (!user || !user.id) console.warn('postVoiceSystemMessage: user.id not available');
-        return;
-    }
+    if (!channelId || !content || !user || !user.id || typeof user.id !== 'string' || !user.id.includes('-')) return;
     try {
         await supabaseClient.from('messages').insert([{
             user_id: user.id,
             channel: 'voice:' + channelId,
             content: String(content),
         }]);
-    } catch (err) { console.error('Voice system message failed', err, 'user_id=', user ? user.id : 'NO_USER', 'channelId=', channelId); }
+    } catch (_) {}
 }
 
 async function joinVC(id, name) {
