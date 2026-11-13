@@ -11,7 +11,30 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="437 Core">
     <title>437 Core</title>
-    <link rel="stylesheet" href="style.css?v=26">
+    <script>
+(function(){
+    window.__CACHE_BUSTER__ = Date.now();
+    var assets = [
+        {type:'css', url:'style.css'},
+        {type:'js', url:'config.js', defer:true},
+        {type:'js', url:'maintenance.js', defer:true},
+        {type:'js', url:'broadcast.js', defer:true},
+        {type:'js', url:'a11y.js', defer:true},
+        {type:'js', url:'app.js', defer:true},
+        {type:'js', url:'dm-calls.js', defer:true}
+    ];
+    assets.forEach(function(a){
+        if(a.type==='css'){
+            var l=document.createElement('link'); l.rel='stylesheet';
+            l.href=a.url+'?cb='+window.__CACHE_BUSTER__;
+            document.head.appendChild(l);
+        } else {
+            var s=document.createElement('script'); s.src=a.url+'?cb='+window.__CACHE_BUSTER__;
+            s.defer=a.defer; document.head.appendChild(s);
+        }
+    });
+})();
+</script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=Audiowide&family=Bungee&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
@@ -101,29 +124,10 @@
                         <button id="screenBtn" class="voice-control-btn" title="Bildschirm teilen">🖥️</button>
                         <button id="speakerBtn" class="voice-control-btn active" title="Lautsprecher">🔊</button>
                         <button id="voiceHistoryBtn" class="voice-control-btn" title="Call-Verlauf">📜</button>
-                        <button id="voiceChatBtn" class="voice-control-btn" title="Text-Chat">💬</button>
                     </div>
                     <div class="voice-quality" id="voiceQuality" style="font-size:0.65rem;color:var(--text-secondary);margin-top:4px;">QUALITÄT: EXZELLENT</div>
                     <button id="leaveVoiceBtn" class="voice-leave-btn">VERLASSEN</button>
                     <div class="voice-participants" id="voiceParticipants"></div>
-                    <div class="voice-history-panel" id="voiceHistoryPanel" style="display:none;">
-                        <div class="voice-history-header">
-                            <span>CALL-VERLAUF</span>
-                            <button id="voiceHistoryClose" class="voice-history-close" title="Schließen">✕</button>
-                        </div>
-                        <div class="voice-history-list" id="voiceHistoryList"></div>
-                    </div>
-                    <div class="voice-chat-panel" id="voiceChatPanel" style="display:none;">
-                        <div class="voice-chat-header">
-                            <span>TEXT-CHAT</span>
-                            <button id="voiceChatClose" class="voice-chat-close" title="Schließen">✕</button>
-                        </div>
-                        <div class="voice-chat-messages" id="voiceChatMessages"></div>
-                        <div class="voice-chat-input-wrap">
-                            <input type="text" id="voiceChatInput" placeholder="Nachricht…" autocomplete="off">
-                            <button id="voiceChatSend" class="voice-chat-send">Senden</button>
-                        </div>
-                    </div>
                 </div>
             </aside>
             <div class="chat-main">
@@ -403,12 +407,6 @@
 
     <div id="callToast" class="call-toast" style="display:none;" role="status" aria-live="polite"></div>
 
-    <script defer src="config.js?v=26"></script>
-    <script defer src="maintenance.js?v=4"></script>
-    <script defer src="broadcast.js?v=8"></script>
-    <script defer src="a11y.js?v=1"></script>
-    <script defer src="app.js?v=26"></script>
-    <script defer src="dm-calls.js?v=2"></script>
     <script>if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
 </body>
 </html>

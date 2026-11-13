@@ -2262,6 +2262,7 @@ window.loadMsgs = async function loadMsgs(opts = {}) {
         if (ch === '437') return true;
         if (isDrops437Channel(ch)) return true;
         if (typeof ch === 'string' && ch.startsWith('dm_')) return ch.includes(user.id) || ch.includes(user.id.slice(0,8));
+        if (typeof ch === 'string' && ch.startsWith('voice:')) return true;
         return false;
     }
     function totalUnreadCount() {
@@ -2786,6 +2787,17 @@ window.loadMsgs = async function loadMsgs(opts = {}) {
             '<span class="channel-name">DROPS 437</span>' +
             '<span class="channel-badge"' + (dropsUnread > 0 ? '' : ' style="display:none;"') + '>' + (dropsUnread > 9 ? '9+' : dropsUnread) + '</span>' +
         '</button>';
+        // Voice Chat Channel (nur sichtbar wenn man im Voice Channel ist)
+        try {
+        if (voice.channelId) {
+            const vname = voice.channelName || 'Voice';
+            const vunread = parseInt(localStorage.getItem(unreadKey('voice:' + voice.channelId))||'0',10);
+            html += '<button class="channel-item voice-channel-item' + (active === ('voice:' + voice.channelId) ? ' active' : '') + '" data-ch="voice:' + voice.channelId + '" title="Voice: ' + esc(vname) + '">' +
+                '<span class="channel-avatar-wrap"><span class="channel-avatar" style="background:var(--neon-green);color:#000;display:flex;align-items:center;justify-content:center;font-weight:bold;">🔊</span>' + (vunread > 0 ? '<span class="channel-badge"' + (vunread > 9 ? '' : ' style="display:none;"') + '>' + (vunread > 9 ? '9+' : vunread) + '</span>' : '') + '</span>' +
+                '<span class="channel-name" style="color:var(--neon-green);">' + esc(vname) + '</span>' +
+            '</button>';
+        }
+        } catch (_) {}
         // Separator + neon heading between channels and DMs
         html += '<div class="channel-separator" aria-hidden="true"><span class="channel-separator-line"></span><span class="channel-separator-label neon-heading">DMs</span><span class="channel-separator-line"></span></div>';
         // DM items for all users
@@ -3675,15 +3687,7 @@ const voiceActive = document.getElementById('voiceActive');
 const voiceActiveName = document.getElementById('voiceActiveName');
 const voiceTimer = document.getElementById('voiceTimer');
 const voiceHistoryBtn = document.getElementById('voiceHistoryBtn');
-const voiceHistoryPanel = document.getElementById('voiceHistoryPanel');
-const voiceHistoryClose = document.getElementById('voiceHistoryClose');
-const voiceHistoryList = document.getElementById('voiceHistoryList');
-const voiceChatBtn = document.getElementById('voiceChatBtn');
-const voiceChatPanel = document.getElementById('voiceChatPanel');
-const voiceChatClose = document.getElementById('voiceChatClose');
-const voiceChatMessages = document.getElementById('voiceChatMessages');
-const voiceChatInput = document.getElementById('voiceChatInput');
-const voiceChatSend = document.getElementById('voiceChatSend');
+const voiceHistoryList = null;
 const voiceParticipantsDiv = document.getElementById('voiceParticipants');
 const muteBtn = document.getElementById('muteBtn');
 const camBtn = document.getElementById('camBtn');
@@ -3814,21 +3818,9 @@ async function requestPermissions(wantCamera) {
 // ---------- Rendering ----------
 function renderVoiceChannels(channels, categories) {
     if (!voiceList) return;
-    const key = channels.map(c => c.id + '|' + c.name + '|' + (c.category_id||'')).join('::');
+    const key = channels.map(c => c.id + '|' + c.name).join('::');
     if (key === voice.lastRenderKey) return;
     voice.lastRenderKey = key;
-
-    // Kategorien-Map
-    const catMap = {};
-    (categories || []).forEach(c => { catMap[c.id] = c; });
-
-    // Gruppiere nach Kategorie
-    const grouped = {};
-    channels.forEach(ch => {
-        const catId = ch.category_id || '__uncategorized__';
-        if (!grouped[catId]) grouped[catId] = [];
-        grouped[catId].push(ch);
-    });
 
     // Teilnehmer-Counts parallel laden
     const countMap = {};
@@ -3837,76 +3829,46 @@ function renderVoiceChannels(channels, categories) {
     voiceList.innerHTML = '';
     const fragment = document.createDocumentFragment();
 
-    // Sortiere Kategorien: unkategorisiert zuletzt
-    const catIds = Object.keys(grouped).sort((a, b) => {
-        if (a === '__uncategorized__') return 1;
-        if (b === '__uncategorized__') return -1;
-        const ca = catMap[a], cb = catMap[b];
-        const sa = ca ? (ca.sort_order || 0) : 0;
-        const sb = cb ? (cb.sort_order || 0) : 0;
-        return sa - sb;
-    });
-
-    catIds.forEach(catId => {
-        const chs = grouped[catId];
-        const cat = catMap[catId];
-
-        // Kategorie-Header (außer bei unkategorisiert)
-        if (catId !== '__uncategorized__' && cat) {
-            const catHeader = document.createElement('div');
-            catHeader.className = 'voice-category-header';
-            catHeader.style.color = cat.color || 'var(--neon-cyan)';
-            catHeader.innerHTML = '<span style="font-size:1.2rem;">' + esc(cat.emoji) + '</span> ' + esc(cat.name);
-            fragment.appendChild(catHeader);
-        } else if (catId === '__uncategorized__' && chs.length > 0) {
-            const catHeader = document.createElement('div');
-            catHeader.className = 'voice-category-header';
-            catHeader.style.color = 'var(--text-secondary)';
-            catHeader.innerHTML = '<span>📁</span> OHNE KATEGORIE';
-            fragment.appendChild(catHeader);
+    channels.forEach(ch => {
+        const inCh = voice.channelId === ch.id;
+        const canDelete = isAdmin();
+        const item = document.createElement('div');
+        item.className = 'voice-item-expanded' + (inCh ? ' active' : '');
+        item.innerHTML =
+            '<div class="voice-item-header">' +
+            '<span>' + esc(ch.name) + '</span>' +
+            '<span class="voice-item-count">' + (inCh ? '●' : '') + '</span>' +
+            '</div>' +
+            '<div class="voice-item-body">' +
+            '<div class="voice-preview-list" id="vp_' + ch.id + '"></div>' +
+            '<div style="display:flex;gap:6px;align-items:center;">' +
+            '<button class="voice-join-btn" data-id="' + ch.id + '" data-name="' + esc(ch.name) + '" ' + (inCh ? 'disabled' : '') + '>' +
+            (inCh ? 'VERBUNDEN' : 'BEITRETEN') +
+            '</button>' +
+            (canDelete ? '<button class="voice-del-btn" data-del="' + ch.id + '" title="Kanal löschen">🗑</button>' : '') +
+            '</div>' +
+            '</div>';
+        const btn = item.querySelector('.voice-join-btn');
+        if (!inCh) {
+            btn.onclick = async () => {
+                const ok = await requestPermissions(false);
+                if (!ok) return;
+                joinVC(ch.id, ch.name);
+            };
         }
-
-        chs.forEach(ch => {
-            const inCh = voice.channelId === ch.id;
-            const canDelete = isAdmin();
-            const item = document.createElement('div');
-            item.className = 'voice-item-expanded' + (inCh ? ' active' : '');
-            item.innerHTML =
-                '<div class="voice-item-header">' +
-                '<span>' + esc(ch.name) + '</span>' +
-                '<span class="voice-item-count">' + (inCh ? '●' : '') + '</span>' +
-                '</div>' +
-                '<div class="voice-item-body">' +
-                '<div class="voice-preview-list" id="vp_' + ch.id + '"></div>' +
-                '<div style="display:flex;gap:6px;align-items:center;">' +
-                '<button class="voice-join-btn" data-id="' + ch.id + '" data-name="' + esc(ch.name) + '" ' + (inCh ? 'disabled' : '') + '>' +
-                (inCh ? 'VERBUNDEN' : 'BEITRETEN') +
-                '</button>' +
-                (canDelete ? '<button class="voice-del-btn" data-del="' + ch.id + '" title="Kanal löschen">🗑</button>' : '') +
-                '</div>' +
-                '</div>';
-            const btn = item.querySelector('.voice-join-btn');
-            if (!inCh) {
-                btn.onclick = async () => {
-                    const ok = await requestPermissions(false);
-                    if (!ok) return;
-                    joinVC(ch.id, ch.name);
-                };
-            }
-            const delBtn = item.querySelector('.voice-del-btn');
-            if (delBtn) {
-                delBtn.onclick = async () => {
-                    if (!confirm('Kanal "' + ch.name + '" wirklich löschen? Alle Teilnehmer werden entfernt.')) return;
-                    try {
-                        await supabaseClient.from('voice_participants').delete().eq('channel_id', ch.id);
-                        await supabaseClient.from('voice_channels').delete().eq('id', ch.id);
-                        if (voice.channelId === ch.id) await leaveVoiceChannel();
-                        loadChannels();
-                    } catch (err) { console.error('Delete channel failed', err); }
-                };
-            }
-            fragment.appendChild(item);
-        });
+        const delBtn = item.querySelector('.voice-del-btn');
+        if (delBtn) {
+            delBtn.onclick = async () => {
+                if (!confirm('Kanal "' + ch.name + '" wirklich löschen? Alle Teilnehmer werden entfernt.')) return;
+                try {
+                    await supabaseClient.from('voice_participants').delete().eq('channel_id', ch.id);
+                    await supabaseClient.from('voice_channels').delete().eq('id', ch.id);
+                    if (voice.channelId === ch.id) await leaveVoiceChannel();
+                    loadChannels();
+                } catch (err) { console.error('Delete channel failed', err); }
+            };
+        }
+        fragment.appendChild(item);
     });
     voiceList.appendChild(fragment);
 
@@ -4083,57 +4045,6 @@ async function loadVoiceHistory() {
 }
 
 // ---------- Voice Text-Chat ----------
-async function loadVoiceChat() {
-    if (!voice.channelId || !voiceChatMessages) return;
-    try {
-        const { data: rows } = await supabaseClient.from('messages')
-            .select('*')
-            .eq('channel', 'voice:' + voice.channelId)
-            .order('created_at', { ascending: true })
-            .limit(100);
-        if (!rows) {
-            voiceChatMessages.innerHTML = '<div style="color:var(--text-secondary);font-size:0.75rem;padding:1rem;text-align:center;">NOCH KEINE NACHRICHTEN</div>';
-            return;
-        }
-        const ids = [...new Set(rows.map(r => r.user_id))];
-        const { data: prs } = await supabaseClient.from('profiles').select('id,nickname,avatar_url').in('id', ids);
-        const prsMap = {};
-        (prs || []).forEach(p => { prsMap[p.id] = p; });
-        voiceChatMessages.innerHTML = '';
-        rows.forEach(r => {
-            const p = prsMap[r.user_id] || { nickname: 'Unbekannt', avatar_url: '' };
-            const isMe = r.user_id === user.id;
-            const div = document.createElement('div');
-            div.className = 'voice-chat-message' + (isMe ? ' me' : '');
-            div.innerHTML =
-                '<div class="voice-chat-avatar"><img src="' + (p.avatar_url || 'https://api.dicebear.com/7.x/pixel-art/svg?seed=' + encodeURIComponent(p.nickname || 'x')) + '" alt="" loading="lazy"></div>' +
-                '<div class="voice-chat-content">' +
-                '<div class="voice-chat-name">' + esc(p.nickname) + (isMe ? ' (DU)' : '') + '</div>' +
-                '<div class="voice-chat-text">' + esc(r.content || '') + '</div>' +
-                '<div class="voice-chat-time">' + new Date(r.created_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + '</div>' +
-                '</div>';
-            voiceChatMessages.appendChild(div);
-        });
-        voiceChatMessages.scrollTop = voiceChatMessages.scrollHeight;
-    } catch (err) { console.error('Voice chat load failed', err); voiceChatMessages.innerHTML = '<div style="color:var(--neon-pink);font-size:0.75rem;padding:1rem;text-align:center;">FEHLER BEIM LADEN</div>'; }
-}
-
-async function sendVoiceChatMessage() {
-    if (!voice.channelId || !voiceChatInput) return;
-    const text = voiceChatInput.value.trim();
-    if (!text) return;
-    try {
-        await supabaseClient.from('messages').insert([{
-            user_id: user.id,
-            channel: 'voice:' + voice.channelId,
-            content: text,
-            attachment: { kind: 'voice_chat' },
-        }]);
-        voiceChatInput.value = '';
-        loadVoiceChat();
-    } catch (err) { console.error('Voice chat send failed', err); alert('Nachricht konnte nicht gesendet werden.'); }
-}
-
 // ---------- WebRTC ----------
 function createPeerConnection(pid) {
     const pc = new RTCPeerConnection(iceConfig);
@@ -4666,6 +4577,8 @@ async function toggleVoiceShare() {
             voice.isScreenSharing = true;
             voice.hadScreen = true;
             screenBtn.classList.add('active', 'screen-active');
+            const me = user.nickname || '437 Core';
+            try { await postVoiceSystemMessage(voice.channelId, '🖥️ ' + esc(me) + ' teilt den Bildschirm'); } catch (_) {}
             track.onended = () => { if (voice.isScreenSharing) toggleVoiceShare(); };
             if (audioTrack) {
                 audioTrack.onended = () => { if (voice.isScreenSharing) toggleVoiceShare(); };
@@ -4715,10 +4628,9 @@ function stopTimer() {
 
 async function loadChannels() {
     try {
-        const { data: chs } = await supabaseClient.from('voice_channels').select('*, voice_channel_categories(*)').order('sort_order', { ascending: true });
-        const { data: cats } = await supabaseClient.from('voice_channel_categories').select('*').order('sort_order', { ascending: true });
+        const { data: chs } = await supabaseClient.from('voice_channels').select('*');
         if (!chs) return;
-        renderVoiceChannels(chs, cats || []);
+        renderVoiceChannels(chs, []);
     } catch (err) { console.error('Load channels failed', err); }
 }
 
@@ -4750,13 +4662,28 @@ async function loadParticipants() {
     } catch (err) { console.error('Load participants failed', err); }
 }
 
+// ---------- Voice System Messages im Chat ----------
+async function postVoiceSystemMessage(channelId, content) {
+    if (!channelId || !content || !user || !user.id) {
+        if (!user || !user.id) console.warn('postVoiceSystemMessage: user.id not available');
+        return;
+    }
+    try {
+        await supabaseClient.from('messages').insert([{
+            user_id: user.id,
+            channel: 'voice:' + channelId,
+            content: String(content),
+        }]);
+    } catch (err) { console.error('Voice system message failed', err, 'user_id=', user ? user.id : 'NO_USER', 'channelId=', channelId); }
+}
+
 async function joinVC(id, name) {
     if (voice.channelId === id) return;
     if (voice.channelId) await leaveVoiceChannel();
 
     try {
-        await supabaseClient.from('voice_participants').insert([{ channel_id: id, user_id: user.id }]);
-    } catch (err) { /* may already exist (UNIQUE constraint) */ }
+        await supabaseClient.from('voice_participants').upsert([{ channel_id: id, user_id: user.id }], { onConflict: 'channel_id,user_id' });
+    } catch (err) { /* may already exist */ }
 
     voice.channelId = id;
     voice.channelName = name;
@@ -4779,6 +4706,10 @@ async function joinVC(id, name) {
         }]).select('id').single();
         if (hist) voice.historyId = hist.id;
     } catch (err) { console.error('Voice history insert failed', err); }
+
+    // System-Nachricht im Voice-Channel-Chat posten (nicht blockierend)
+    const me = user.nickname || '437 Core';
+    try { await postVoiceSystemMessage(id, '🔊 ' + esc(me) + ' ist dem Voice-Channel beigetreten'); } catch (_) {}
 
     // Host = Ersteller des Channels
     try {
@@ -4806,6 +4737,9 @@ async function joinVC(id, name) {
     }
 
     if (chatSidebar) chatSidebar.classList.remove('open');
+
+    // Render channel strip so Voice Chat appears next to DROPS 437
+    try { renderChannelStrip(); } catch (_) {}
 
     // Push-Benachrichtigung an andere Channel-Mitglieder senden
     sendVoiceJoinPush(id, name);
@@ -4903,11 +4837,22 @@ async function leaveVoiceChannel() {
     stopTimer();
 
     const cid = voice.channelId;
+    const oldVoiceChannel = currentChannel;
     const dur = Math.max(0, Math.floor((Date.now() - voice.startTime) / 1000));
     voice.channelId = null;
     voice.channelName = '';
     localStorage.removeItem('voiceChannelId');
     voiceActive.style.display = 'none';
+
+    // System-Nachricht im Voice-Channel-Chat posten (nicht blockierend)
+    const me = user.nickname || '437 Core';
+    try { await postVoiceSystemMessage(cid, '🔊 ' + esc(me) + ' hat den Voice-Channel verlassen'); } catch (_) {}
+
+    // Wenn der aktive Channel der Voice-Chat war, zu 437 wechseln
+    if (oldVoiceChannel === ('voice:' + cid)) {
+        currentChannel = '437';
+        try { localStorage.setItem('437core_channel', '437'); } catch(_) {}
+    }
 
     // Call-Verlauf abschließen
     if (voice.historyId) {
@@ -4994,25 +4939,14 @@ screenBtn.onclick = toggleVoiceShare;
 leaveVoiceBtn.onclick = leaveVoiceChannel;
 createVoiceBtn.onclick = createChannel;
 voiceHistoryBtn.onclick = () => {
-    const show = voiceHistoryPanel.style.display !== 'block';
-    voiceHistoryPanel.style.display = show ? 'block' : 'none';
-    if (show) {
-        voiceChatPanel.style.display = 'none';
-        loadVoiceHistory();
-    }
+    const panel = document.getElementById('voiceHistoryPanel');
+    const close = document.getElementById('voiceHistoryClose');
+    if (!panel || !close) return;
+    const show = panel.style.display !== 'block';
+    panel.style.display = show ? 'block' : 'none';
+    close.onclick = () => { panel.style.display = 'none'; };
+    if (show) loadVoiceHistory();
 };
-voiceHistoryClose.onclick = () => { voiceHistoryPanel.style.display = 'none'; };
-voiceChatBtn.onclick = () => {
-    const show = voiceChatPanel.style.display !== 'block';
-    voiceChatPanel.style.display = show ? 'block' : 'none';
-    if (show) {
-        voiceHistoryPanel.style.display = 'none';
-        loadVoiceChat();
-    }
-};
-voiceChatClose.onclick = () => { voiceChatPanel.style.display = 'none'; };
-voiceChatSend.onclick = sendVoiceChatMessage;
-voiceChatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendVoiceChatMessage(); });
 
 // ---------- Wake Lock & Visibility (mobile) ----------
 let wakeLock = null;
@@ -5051,7 +4985,6 @@ document.addEventListener('visibilitychange', () => {
         speakerBtn.classList.remove('deafened');
         speakerBtn.textContent = '🔊';
         document.querySelectorAll('video[remote]').forEach(v => { v.muted = false; v.volume = 1; });
-        initLocalVAD();
     }
 });
 
