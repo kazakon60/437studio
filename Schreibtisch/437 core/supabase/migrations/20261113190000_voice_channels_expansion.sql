@@ -4,7 +4,7 @@
 -- 1. voice_call_history — dauerhafte Speicherung von Voice-Session-Teilnahmen
 CREATE TABLE IF NOT EXISTS public.voice_call_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  channel_id TEXT NOT NULL REFERENCES public.voice_channels(id) ON DELETE CASCADE,
+  channel_id UUID NOT NULL REFERENCES public.voice_channels(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   left_at TIMESTAMPTZ,
@@ -23,7 +23,15 @@ DROP POLICY IF EXISTS "Voice call history erstellen" ON public.voice_call_histor
 CREATE POLICY "Voice call history erstellen" ON public.voice_call_history FOR INSERT TO anon, authenticated WITH CHECK (true);
 DROP POLICY IF EXISTS "Voice call history aktualisieren" ON public.voice_call_history;
 CREATE POLICY "Voice call history aktualisieren" ON public.voice_call_history FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-ALTER PUBLICATION supabase_realtime ADD TABLE public.voice_call_history;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'voice_call_history'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.voice_call_history;
+  END IF;
+END $$;
 
 -- 2. voice_channel_categories — Kategorien zur Channel-Organisation
 CREATE TABLE IF NOT EXISTS public.voice_channel_categories (
@@ -40,7 +48,15 @@ DROP POLICY IF EXISTS "Voice channel categories sichtbar" ON public.voice_channe
 CREATE POLICY "Voice channel categories sichtbar" ON public.voice_channel_categories FOR SELECT TO anon, authenticated USING (true);
 DROP POLICY IF EXISTS "Voice channel categories erstellen" ON public.voice_channel_categories;
 CREATE POLICY "Voice channel categories erstellen" ON public.voice_channel_categories FOR INSERT TO anon, authenticated WITH CHECK (true);
-ALTER PUBLICATION supabase_realtime ADD TABLE public.voice_channel_categories;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'voice_channel_categories'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.voice_channel_categories;
+  END IF;
+END $$;
 
 -- 3. category_id zu voice_channels
 ALTER TABLE public.voice_channels ADD COLUMN IF NOT EXISTS category_id UUID REFERENCES public.voice_channel_categories(id) ON DELETE SET NULL;
